@@ -84,18 +84,26 @@ elif os.environ.get("POSTGRES_DB"):
         }
     }
 else:
-    # SQLite: explicit path, or data/db.sqlite3 (pushed to git for deploy), or writable dir, or Heroku /tmp, else project root.
+    # SQLite: explicit path, or data/db.sqlite3 (pushed to git), or writable dir, or cloud /tmp, else project root.
+    # On cloud (Heroku, DigitalOcean), copy bundled DB to /tmp so it's writable and avoids "file is not a database".
     _bundled_db = BASE_DIR / "data" / "db.sqlite3"
+    _on_cloud = bool(os.environ.get("PORT") or os.environ.get("DYNO") or os.environ.get("HEROKU_APP_NAME"))
     _sqlite_path_env = os.environ.get("SQLITE_DB_PATH")
     if _sqlite_path_env:
         _sqlite_path = _sqlite_path_env
     elif _bundled_db.exists():
-        _sqlite_path = str(_bundled_db)
+        if _on_cloud:
+            import shutil
+            _tmp_db = os.path.join(os.environ.get("TMPDIR", "/tmp"), "db.sqlite3")
+            shutil.copy2(str(_bundled_db), _tmp_db)
+            _sqlite_path = _tmp_db
+        else:
+            _sqlite_path = str(_bundled_db)
     else:
         _sqlite_dir = os.environ.get("SQLITE_DB_DIR")
         if _sqlite_dir:
             _sqlite_path = os.path.join(_sqlite_dir, "db.sqlite3")
-        elif os.environ.get("DYNO") or os.environ.get("HEROKU_APP_NAME"):
+        elif _on_cloud:
             _sqlite_path = os.path.join(os.environ.get("TMPDIR", "/tmp"), "db.sqlite3")
         else:
             _sqlite_path = str(BASE_DIR / "db.sqlite3")
