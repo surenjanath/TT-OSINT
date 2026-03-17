@@ -3,7 +3,7 @@
 # 2. Set DJANGO_SECRET_KEY and ALLOWED_HOSTS in the App Platform UI (Settings → Environment Variables).
 # 3. Replace github.repo below with your owner/repo if using doctl or API.
 #
-# PostgreSQL is included; DATABASE_URL is set automatically. Data persists across deploys.
+# PostgreSQL 14 is used (avoids "permission denied for schema public" on PG 15+). DATABASE_URL is set automatically.
 
 name: tt-osint
 region: nyc
@@ -14,7 +14,7 @@ features:
 databases:
   - name: db
     engine: PG
-    version: "16"
+    version: "14"
 
 services:
   - name: web
