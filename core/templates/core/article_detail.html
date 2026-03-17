@@ -1,0 +1,316 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="article-detail-page">
+    <nav class="article-detail-breadcrumb">
+        <a href="{% url 'article_list' %}">News Feed</a>
+        <span class="article-detail-breadcrumb-sep">/</span>
+        <span class="article-detail-breadcrumb-current">Article #{{ article.pk }}</span>
+    </nav>
+
+    <div class="article-detail-layout">
+        <main class="article-detail-main">
+            <!-- Hero: image + title + meta -->
+            <article class="article-detail-hero card">
+                {% if article.image_url %}
+                <div class="article-detail-hero-image">
+                    <img src="{{ article.image_url }}" alt="" loading="lazy" onerror="this.parentElement.style.display='none'" />
+                </div>
+                {% endif %}
+                <div class="article-detail-hero-body">
+                    <div class="article-detail-meta">
+                        <span class="article-detail-source">{{ article.source.name }}</span>
+                        {% if article.published_date %}
+                        <time datetime="{{ article.published_date|date:'c' }}">{{ article.published_date|date:"F j, Y \u2022 g:i a" }}</time>
+                        {% endif %}
+                        <span class="article-detail-status article-detail-status--{% if article.is_processed %}done{% elif article.processing_error %}failed{% else %}pending{% endif %}">
+                            {% if article.is_processed %}AI Processed{% elif article.processing_error %}Failed{% else %}Pending AI{% endif %}
+                        </span>
+                    </div>
+                    <h1 class="article-detail-title">{{ article.title }}</h1>
+                    {% if article.tags_list %}
+                    <div class="article-detail-tags">
+                        {% for tag in article.tags_list %}
+                        <span class="article-detail-tag">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div class="article-detail-byline">
+                        {% if article.author %}<span>By <strong>{{ article.author }}</strong></span>{% endif %}
+                        <span>Scraped {{ article.scraped_date|date:"M j, Y" }}</span>
+                        {% if word_count %}<span>{{ word_count }} words</span>{% endif %}
+                    </div>
+                    <div class="article-detail-actions">
+                        <a href="{{ article.url }}" target="_blank" rel="noopener" class="btn btn-primary">Read original &rarr;</a>
+                        <a href="{% url 'article_list' %}?source={{ article.source.pk }}" class="btn btn-secondary">More from {{ article.source.name }}</a>
+                    </div>
+                </div>
+            </article>
+
+            {% if article.stories.exists %}
+            <section class="article-detail-section card">
+                <h2 class="article-detail-section-title">Story</h2>
+                {% for story in article.stories.all %}
+                <p style="margin: 0;"><a href="{% url 'story_detail' story.pk %}" style="color: var(--accent-primary); font-weight: 600;">{{ story.title }}</a> — {{ story.articles.count }} article{{ story.articles.count|pluralize }} in this cluster</p>
+                {% endfor %}
+            </section>
+            {% endif %}
+
+            {% if article.summary %}
+            <section class="article-detail-section card">
+                <h2 class="article-detail-section-title">Summary</h2>
+                <p class="article-detail-summary">{{ article.summary }}</p>
+            </section>
+            {% endif %}
+
+            <section class="article-detail-section card">
+                <h2 class="article-detail-section-title">Article content</h2>
+                {% if article.content %}
+                <div class="article-detail-content">{{ article.content }}</div>
+                {% else %}
+                <p class="article-detail-empty">No content was extracted from this source.</p>
+                {% endif %}
+            </section>
+
+            <section class="article-detail-section card">
+                <h2 class="article-detail-section-title">Extracted data</h2>
+                <p class="article-detail-section-desc">Fields stored from the scraper. Empty values shown as —.</p>
+                <dl class="article-detail-dl">
+                    <dt>title</dt><dd>{{ article.title|default:"—" }}</dd>
+                    <dt>url</dt><dd><a href="{{ article.url }}" target="_blank" rel="noopener">{{ article.url }}</a></dd>
+                    <dt>source</dt><dd>{{ article.source.name }}</dd>
+                    <dt>author</dt><dd>{{ article.author|default:"—" }}</dd>
+                    <dt>published_date</dt><dd>{% if article.published_date %}{{ article.published_date|date:"Y-m-d H:i:s" }}{% else %}—{% endif %}</dd>
+                    <dt>scraped_date</dt><dd>{{ article.scraped_date|date:"Y-m-d H:i:s" }}</dd>
+                    <dt>is_processed</dt><dd>{{ article.is_processed|yesno:"Yes,No" }}</dd>
+                    <dt>tags</dt><dd>{{ article.tags|default:"—" }}</dd>
+                    <dt>image_url</dt><dd>{% if article.image_url %}<a href="{{ article.image_url }}" target="_blank" rel="noopener">{{ article.image_url|truncatechars:60 }}</a>{% else %}—{% endif %}</dd>
+                    <dt>summary</dt><dd>{{ article.summary|default:"—"|truncatewords:40 }}</dd>
+                    <dt>content</dt><dd>{{ article.content|length }} chars · {{ word_count }} words · {{ article.content|default:""|truncatewords:25 }}</dd>
+                </dl>
+            </section>
+
+            {% if article.raw_api_data %}
+            <section class="article-detail-section card article-detail-raw">
+                <h2 class="article-detail-section-title">Raw API payload</h2>
+                <p class="article-detail-section-desc">Original JSON from the API. Toggle view below.</p>
+                <div class="article-detail-raw-toolbar">
+                    <button type="button" class="btn btn-sm" id="toggle-raw-json">Show as JSON</button>
+                </div>
+                <div id="raw-api-keyvalue" class="article-detail-raw-table-wrap">
+                    <table class="article-detail-raw-table">
+                        <thead>
+                            <tr><th>Key</th><th>Value</th></tr>
+                        </thead>
+                        <tbody>
+                            {% for key, display_value in raw_api_rows %}
+                            <tr>
+                                <td class="article-detail-raw-key">{{ key }}</td>
+                                <td class="article-detail-raw-val">{{ display_value }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <pre id="raw-api-json" class="article-detail-raw-json" style="display:none;">{{ raw_api_data_json }}</pre>
+            </section>
+            {% endif %}
+        </main>
+
+        <aside class="article-detail-sidebar">
+            <div class="card article-detail-sidebar-card">
+                <h3 class="article-detail-sidebar-title">AI Intelligence</h3>
+                <div class="article-detail-status-box article-detail-status-box--{% if article.is_processed %}done{% elif article.processing_error %}failed{% else %}pending{% endif %}">
+                    <span class="article-detail-status-box-label">{% if article.is_processed %}Analysis complete{% elif article.processing_error %}Analysis failed{% else %}Pending analysis{% endif %}</span>
+                    <span class="article-detail-status-box-desc">{% if article.is_processed %}Found {{ incidents|length }} incident{{ incidents|length|pluralize }}{% elif article.processing_error %}{{ article.processing_error }}{% else %}Not yet processed by the AI pipeline{% endif %}</span>
+                </div>
+                <button type="button" onclick="reanalyzeArticle({{ article.pk }})" id="btn-reanalyze" class="btn btn-primary article-detail-reanalyze">
+                    <span>Re-analyze document</span>
+                </button>
+                {% if article.is_processed and incidents %}
+                <a href="{% url 'article_extraction_detail' article.pk %}" class="btn btn-sm" style="margin-top:8px;display:inline-block;text-decoration:none;">
+                    🔍 View extraction details
+                </a>
+                {% endif %}
+                <div id="reanalyze-status" class="article-detail-reanalyze-status" style="display:none;"></div>
+
+                {% if incidents %}
+                <h4 class="article-detail-incidents-title">Extracted incidents ({{ incidents|length }})</h4>
+                <ul class="article-detail-incidents">
+                    {% for inc in incidents %}
+                    <li>
+                        <a href="{% url 'incident_detail' inc.pk %}" class="article-detail-incident-link article-detail-incident--{{ inc.severity }}">
+                            <span class="article-detail-incident-type">{{ inc.incident_type }}</span>
+                            <span class="badge badge-{{ inc.severity }}">{{ inc.get_severity_display }}</span>
+                            <span class="article-detail-incident-loc">{{ inc.location_name|default:"Unknown"|truncatechars:36 }}</span>
+                            <span class="article-detail-incident-meta">
+                                {% if inc.victim_count %}Victims: {{ inc.victim_count }}{% endif %}
+                                {% if inc.fatality_count %}<span class="article-detail-incident-deaths">Deaths: {{ inc.fatality_count }}</span>{% endif %}
+                                {% if inc.weapon %}{{ inc.weapon }}{% endif %}
+                                Conf: {{ inc.confidence_score|floatformat:0 }}%
+                            </span>
+                            {% if inc.latitude and inc.longitude %}
+                            <span class="article-detail-incident-coords">{{ inc.latitude|floatformat:4 }}, {{ inc.longitude|floatformat:4 }}</span>
+                            {% endif %}
+                        </a>
+                        {% with sources=inc.get_source_articles %}
+                        {% if sources|length > 1 %}
+                        <div style="font-size:11px;color:var(--text-muted);margin-top:4px;margin-left:0;">
+                            Also reported in other articles — <a href="{% url 'incident_detail' inc.pk %}" style="color:var(--accent-primary);">View all {{ sources|length }} sources</a>
+                        </div>
+                        {% endif %}
+                        {% endwith %}
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% endif %}
+            </div>
+
+            <div class="card article-detail-meta-card">
+                <h3 class="article-detail-sidebar-title">Metadata</h3>
+                <dl class="article-detail-meta-dl">
+                    <dt>ID</dt><dd>#{{ article.pk }}</dd>
+                    <dt>Source</dt><dd>{{ article.source.name }}</dd>
+                    <dt>Published</dt><dd>{% if article.published_date %}{{ article.published_date|date:"M j, Y H:i" }}{% else %}—{% endif %}</dd>
+                    <dt>Scraped</dt><dd>{{ article.scraped_date|date:"M j, Y H:i" }}</dd>
+                    <dt>Processed</dt><dd>{{ article.is_processed|yesno:"Yes,No" }}</dd>
+                    <dt>Words</dt><dd>{{ word_count }}</dd>
+                    <dt>URL</dt><dd><a href="{{ article.url }}" target="_blank" rel="noopener">{{ article.url|truncatechars:40 }}</a></dd>
+                </dl>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<style>
+.article-detail-page { max-width: 1480px; margin: 0 auto; padding: 0 16px 32px; }
+.article-detail-breadcrumb { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+.article-detail-breadcrumb a { color: var(--text-muted); text-decoration: none; }
+.article-detail-breadcrumb a:hover { color: var(--accent-primary); }
+.article-detail-breadcrumb-sep { margin: 0 6px; opacity: 0.6; }
+.article-detail-breadcrumb-current { color: var(--text-secondary); font-weight: 500; }
+
+.article-detail-layout { display: grid; grid-template-columns: 1fr 360px; gap: 28px; align-items: start; }
+@media (max-width: 1024px) { .article-detail-layout { grid-template-columns: 1fr; } }
+
+.article-detail-main { min-width: 0; display: flex; flex-direction: column; gap: 20px; }
+.article-detail-hero { padding: 0; overflow: hidden; }
+.article-detail-hero-image { max-height: 340px; overflow: hidden; background: var(--bg-hover); }
+.article-detail-hero-image img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.article-detail-hero-body { padding: 28px 32px; }
+.article-detail-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; }
+.article-detail-source { font-size: 12px; font-weight: 600; color: var(--accent-primary); text-transform: uppercase; letter-spacing: 0.04em; }
+.article-detail-meta time { font-size: 13px; color: var(--text-muted); }
+.article-detail-status { font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 6px; }
+.article-detail-status--done { background: rgba(16, 124, 65, 0.1); color: var(--accent-success); }
+.article-detail-status--pending { background: rgba(197, 90, 17, 0.1); color: var(--accent-warning); }
+.article-detail-title { margin: 0 0 12px; font-size: 28px; font-weight: 700; line-height: 1.28; color: var(--text-primary); letter-spacing: -0.02em; }
+.article-detail-tags { margin-bottom: 14px; }
+.article-detail-tag { display: inline-block; font-size: 11px; padding: 4px 10px; margin-right: 6px; margin-bottom: 6px; background: var(--bg-hover); color: var(--text-secondary); border-radius: 6px; }
+.article-detail-byline { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 16px; }
+.article-detail-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.article-detail-actions .btn-secondary { background: var(--bg-hover); color: var(--text-secondary); border: 1px solid var(--border-subtle); }
+.article-detail-actions .btn-secondary:hover { background: var(--border-subtle); color: var(--text-primary); }
+
+.article-detail-section { padding: 24px 28px; }
+.article-detail-section-title { margin: 0 0 8px; font-size: 14px; font-weight: 600; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; }
+.article-detail-section-desc { font-size: 12px; color: var(--text-muted); margin: 0 0 16px; }
+.article-detail-summary { margin: 0; font-size: 15px; line-height: 1.65; color: var(--text-secondary); }
+.article-detail-content { font-size: 15px; line-height: 1.7; color: var(--text-secondary); white-space: pre-wrap; word-break: break-word; }
+.article-detail-empty { color: var(--text-muted); font-style: italic; margin: 0; }
+
+.article-detail-dl { display: grid; grid-template-columns: 180px 1fr; gap: 10px 24px; margin: 0; font-size: 13px; }
+.article-detail-dl dt { color: var(--text-muted); font-weight: 500; font-family: var(--font-mono); font-size: 12px; }
+.article-detail-dl dd { margin: 0; word-break: break-word; }
+.article-detail-dl dd a { color: var(--accent-primary); }
+@media (max-width: 600px) { .article-detail-dl { grid-template-columns: 1fr; } }
+
+.article-detail-raw-toolbar { margin-bottom: 12px; }
+.article-detail-raw-table-wrap { overflow-x: auto; margin-bottom: 12px; }
+.article-detail-raw-table { width: 100%; font-size: 12px; border-collapse: collapse; }
+.article-detail-raw-table th { text-align: left; padding: 8px 12px; background: var(--bg-hover); color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+.article-detail-raw-table td { padding: 10px 12px; border-bottom: 1px solid var(--border-subtle); vertical-align: top; }
+.article-detail-raw-key { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); width: 200px; }
+.article-detail-raw-val { white-space: pre-wrap; word-break: break-word; font-size: 11px; max-width: 520px; }
+.article-detail-raw-json { margin: 0; padding: 20px; background: var(--bg-deep); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); font-size: 11px; line-height: 1.5; overflow: auto; max-height: 420px; white-space: pre-wrap; word-break: break-word; font-family: var(--font-mono); }
+
+.article-detail-sidebar { position: sticky; top: 20px; }
+.article-detail-sidebar-card { padding: 20px; margin-bottom: 20px; }
+.article-detail-sidebar-title { margin: 0 0 14px; font-size: 13px; font-weight: 600; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.03em; }
+.article-detail-status-box { padding: 14px; border-radius: var(--radius-md); margin-bottom: 16px; }
+.article-detail-status-box--done { background: rgba(16, 124, 65, 0.08); border: 1px solid rgba(16, 124, 65, 0.2); }
+.article-detail-status-box--pending { background: rgba(197, 90, 17, 0.08); border: 1px solid rgba(197, 90, 17, 0.2); }
+.article-detail-status-box-label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+.article-detail-status-box--done .article-detail-status-box-label { color: var(--accent-success); }
+.article-detail-status-box--pending .article-detail-status-box-label { color: var(--accent-warning); }
+.article-detail-status-box-desc { font-size: 12px; color: var(--text-muted); }
+.article-detail-reanalyze { width: 100%; margin-bottom: 12px; }
+.article-detail-reanalyze-status { font-size: 12px; text-align: center; margin-bottom: 12px; }
+.article-detail-incidents-title { margin: 0 0 10px; font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.article-detail-incidents { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.article-detail-incident-link { display: block; padding: 12px; background: var(--bg-hover); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); text-decoration: none; color: inherit; border-left: 4px solid var(--border-default); transition: border-color 0.15s, box-shadow 0.15s; }
+.article-detail-incident-link:hover { border-color: var(--accent-primary); box-shadow: var(--shadow-sm); }
+.article-detail-incident--low { border-left-color: var(--severity-low); }
+.article-detail-incident--medium { border-left-color: var(--severity-medium); }
+.article-detail-incident--high { border-left-color: var(--severity-high); }
+.article-detail-incident--critical { border-left-color: var(--severity-critical); }
+.article-detail-incident-type { display: block; font-weight: 700; font-size: 12px; color: var(--text-primary); margin-bottom: 4px; }
+.article-detail-incident-link .badge { font-size: 9px; padding: 2px 6px; float: right; }
+.article-detail-incident-loc { display: block; font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.article-detail-incident-meta { font-size: 11px; color: var(--text-muted); }
+.article-detail-incident-deaths { color: var(--accent-danger); }
+.article-detail-incident-coords { display: block; font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); margin-top: 4px; }
+.article-detail-meta-card { padding: 20px; }
+.article-detail-meta-dl { margin: 0; font-size: 12px; }
+.article-detail-meta-dl dt { color: var(--text-muted); padding: 6px 0 0; width: 80px; float: left; clear: left; }
+.article-detail-meta-dl dd { margin: 6px 0 0 90px; padding: 0; }
+.article-detail-meta-dl dd a { color: var(--accent-primary); }
+</style>
+
+<script>
+function reanalyzeArticle(pk) {
+    var btn = document.getElementById('btn-reanalyze');
+    var span = btn ? btn.querySelector('span') : null;
+    var statusDiv = document.getElementById('reanalyze-status');
+    var orig = span ? span.textContent : 'Re-analyze';
+
+    if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; }
+    if (span) span.textContent = 'Processing…';
+    if (statusDiv) { statusDiv.style.display = 'block'; statusDiv.textContent = 'Sending to AI pipeline…'; statusDiv.style.color = 'var(--text-muted)'; }
+
+    fetch('/api/pipeline/reanalyze/' + pk + '/', { method: 'POST', headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json'} })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.status === 'started' || data.status === 'ok') {
+            if (statusDiv) { statusDiv.textContent = 'Analysis submitted. Reloading…'; statusDiv.style.color = 'var(--accent-success)'; }
+            setTimeout(function() { window.location.reload(); }, 2000);
+        } else { throw new Error(data.message || 'Unknown error'); }
+    })
+    .catch(function(err) {
+        if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        if (span) span.textContent = orig;
+        if (statusDiv) { statusDiv.style.display = 'block'; statusDiv.textContent = err.message; statusDiv.style.color = 'var(--accent-danger)'; }
+    });
+}
+{% if article.raw_api_data %}
+document.addEventListener('DOMContentLoaded', function() {
+    var btn = document.getElementById('toggle-raw-json');
+    var keyvalue = document.getElementById('raw-api-keyvalue');
+    var jsonPre = document.getElementById('raw-api-json');
+    if (btn && keyvalue && jsonPre) {
+        btn.addEventListener('click', function() {
+            if (jsonPre.style.display === 'none') {
+                jsonPre.style.display = 'block';
+                keyvalue.style.display = 'none';
+                btn.textContent = 'Show as key-value table';
+            } else {
+                jsonPre.style.display = 'none';
+                keyvalue.style.display = 'block';
+                btn.textContent = 'Show as JSON';
+            }
+        });
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

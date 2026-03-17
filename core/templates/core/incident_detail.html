@@ -1,0 +1,462 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div>
+    <!-- Breadcrumb -->
+    <div style="margin-bottom:16px;font-size:13px;color:var(--text-muted);">
+        <a href="{% url 'home' %}" style="color:var(--text-muted);">Home</a> ›
+        <a href="{% url 'incident_list' %}" style="color:var(--text-muted);">Incidents</a> ›
+        <span style="color:var(--accent);">{{ incident.incident_type }}</span>
+    </div>
+
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;">
+        <div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+                <span class="badge badge-{{ incident.severity }}">{{ incident.get_severity_display }}</span>
+                <span style="font-size:12px;color:var(--text-muted);font-family:var(--font-mono);">ID: #{{ incident.pk }}</span>
+            </div>
+            <h1 style="margin:0 0 8px 0;font-size:24px;">{{ incident.incident_type }}</h1>
+            <div style="display:flex;gap:16px;font-size:13px;color:var(--text-muted);">
+                {% if incident.incident_date %}
+                <span>Published: {{ incident.incident_date|date:"M d, Y — H:i" }}</span>
+                {% endif %}
+                {% if incident.ai_incident_date %}
+                <span style="color:var(--text-muted);font-size:11px;" title="Date extracted by AI (may differ from publish date)">AI date: {{ incident.ai_incident_date|date:"M d, Y" }}</span>
+                {% endif %}
+                {% if incident.primary_article %}
+                <a href="{% url 'article_detail' incident.primary_article.pk %}" style="color:var(--accent-primary);text-decoration:none;">{{ incident.primary_article.source.name }}</a>
+                {% endif %}
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm" onclick="window.print()">🖨 Print</button>
+            {% if incident.primary_article %}
+            <a href="{{ incident.primary_article.url }}" target="_blank" class="btn btn-sm">🔗 Source Link</a>
+            <a href="{% url 'article_extraction_detail' incident.primary_article.pk %}" class="btn btn-sm">🔍 Extraction detail</a>
+            {% endif %}
+            <a href="{% url 'incident_list' %}" class="btn btn-sm">← Back to List</a>
+        </div>
+    </div>
+
+    <!-- Info Cards Row -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;">
+        <div class="card" style="padding:14px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:4px;">Type</div>
+            <div style="font-size:15px;font-weight:600;">{{ incident.get_category_display }}</div>
+        </div>
+        <div class="card" style="padding:14px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:4px;">Location</div>
+            <div style="font-size:15px;font-weight:600;">{{ incident.location_name|default:"Unknown" }}</div>
+        </div>
+        <div class="card" style="padding:14px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:4px;">Region</div>
+            <div style="font-size:15px;font-weight:600;">{{ incident.get_region_display }}</div>
+        </div>
+        <div class="card" style="padding:14px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);margin-bottom:4px;">Status</div>
+            <div><span class="badge badge-{{ incident.status }}">{{ incident.get_status_display }}</span></div>
+        </div>
+    </div>
+
+    <!-- Main Grid: Left content + Right sidebar -->
+    <div style="display:grid;grid-template-columns:1fr 380px;gap:20px;">
+        <!-- Left Column -->
+        <div>
+            <!-- AI Description -->
+            <div class="card" style="margin-bottom:16px;">
+                <div class="card-header">
+                    <h3>🤖 AI-Extracted Intelligence</h3>
+                </div>
+                <div class="card-body">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+                        <div>
+                            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;">Incident Details</div>
+                            <table style="width:100%;font-size:13px;">
+                                <tr>
+                                    <td style="color:var(--text-muted);padding:4px 0;width:120px;">Incident Type</td>
+                                    <td style="padding:4px 0;"><strong>{{ incident.incident_type }}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td style="color:var(--text-muted);padding:4px 0;">Category</td>
+                                    <td style="padding:4px 0;">{{ incident.get_category_display }}</td>
+                                </tr>
+                                <tr>
+                                    <td style="color:var(--text-muted);padding:4px 0;">Severity</td>
+                                    <td style="padding:4px 0;">
+                                        <span style="color:{{ incident.severity_color }};font-weight:600;">{{ incident.get_severity_display }}</span>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td style="color:var(--text-muted);padding:4px 0;">Confidence</td>
+                                    <td style="padding:4px 0;">
+                                        <div class="confidence-gauge-wrap">
+                                            <div class="confidence-gauge-track">
+                                                <div class="confidence-gauge-fill {% if incident.confidence_score >= 80 %}confidence-high{% elif incident.confidence_score >= 50 %}confidence-med{% else %}confidence-low{% endif %}"
+                                                     style="width:{{ incident.confidence_score }}%;"></div>
+                                            </div>
+                                            <span style="font-family:var(--font-mono);font-size:14px;font-weight:600;">{{ incident.confidence_score|floatformat:1 }}%</span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div>
+                            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;">Assessment</div>
+                            <p style="font-size:13px;line-height:1.6;color:var(--text-secondary);">{{ incident.description }}</p>
+
+                            {% if incident.victim_count or incident.fatality_count or incident.injured_count or incident.weapon or incident.suspect_description or incident.vehicle_info or incident.incident_time or incident.value_stolen or incident.premises_type or incident.motive or incident.is_resolved %}
+                            <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-default);">
+                                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:8px;">Enriched Details</div>
+                                <table style="width:100%;font-size:13px;">
+                                    {% if incident.victim_count %}
+                                    <tr>
+                                        <td style="color:var(--text-muted);padding:3px 0;width:100px;">Victims</td>
+                                        <td style="padding:3px 0;font-weight:600;color:#f97316;">{{ incident.victim_count }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if incident.fatality_count %}
+                                    <tr>
+                                        <td style="color:var(--text-muted);padding:3px 0;">Fatalities</td>
+                                        <td style="padding:3px 0;font-weight:600;color:#ef4444;">{{ incident.fatality_count }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if incident.injured_count %}
+                                    <tr>
+                                        <td style="color:var(--text-muted);padding:3px 0;">Injured</td>
+                                        <td style="padding:3px 0;">{{ incident.injured_count }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if incident.weapon %}
+                                    <tr>
+                                        <td style="color:var(--text-muted);padding:3px 0;">Weapon</td>
+                                        <td style="padding:3px 0;">{{ incident.weapon }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if incident.incident_time %}
+                                    <tr>
+                                        <td style="color:var(--text-muted);padding:3px 0;">Time</td>
+                                        <td style="padding:3px 0;">{{ incident.incident_time }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if incident.value_stolen %}
+                                    <tr>
+                                        <td style="color:var(--text-muted);padding:3px 0;">Value stolen</td>
+                                        <td style="padding:3px 0;">{{ incident.value_stolen }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if incident.premises_type %}
+                                    <tr>
+                                        <td style="color:var(--text-muted);padding:3px 0;">Premises</td>
+                                        <td style="padding:3px 0;">{{ incident.premises_type }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if incident.motive %}
+                                    <tr>
+                                        <td style="color:var(--text-muted);padding:3px 0;">Motive</td>
+                                        <td style="padding:3px 0;">{{ incident.motive }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if incident.is_resolved %}
+                                    <tr>
+                                        <td style="color:var(--text-muted);padding:3px 0;">Resolved</td>
+                                        <td style="padding:3px 0;">Yes</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if incident.suspect_description %}
+                                    <tr>
+                                        <td style="color:var(--text-muted);padding:3px 0;">Suspects</td>
+                                        <td style="padding:3px 0;">{{ incident.suspect_description }}</td>
+                                    </tr>
+                                    {% endif %}
+                                    {% if incident.vehicle_info %}
+                                    <tr>
+                                        <td style="color:var(--text-muted);padding:3px 0;">Vehicle</td>
+                                        <td style="padding:3px 0;">{{ incident.vehicle_info }}</td>
+                                    </tr>
+                                    {% endif %}
+                                </table>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if incident.persons.exists %}
+            <div class="card" style="margin-bottom:16px;">
+                <div class="card-header"><h3>Persons Involved</h3></div>
+                <div class="card-body" style="padding:0;">
+                    <table class="data-table" style="margin:0;">
+                        <thead>
+                            <tr>
+                                <th style="padding:10px 14px;">Role</th>
+                                <th style="padding:10px 14px;">Name</th>
+                                <th style="padding:10px 14px;">Age</th>
+                                <th style="padding:10px 14px;">Gender</th>
+                                <th style="padding:10px 14px;">Condition</th>
+                                <th style="padding:10px 14px;">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in incident.persons.all %}
+                            <tr>
+                                <td style="padding:10px 14px;"><span class="badge badge-category">{{ p.get_role_display }}</span></td>
+                                <td style="padding:10px 14px;">{{ p.name|default:"—" }}</td>
+                                <td style="padding:10px 14px;">{% if p.age %}{{ p.age }}{% else %}—{% endif %}</td>
+                                <td style="padding:10px 14px;">{{ p.get_gender_display }}</td>
+                                <td style="padding:10px 14px;">{{ p.get_condition_display }}</td>
+                                <td style="padding:10px 14px;font-size:13px;color:var(--text-secondary);">{{ p.description|default:"—"|truncatewords:15 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Original Report (primary article) -->
+            {% if incident.primary_article %}
+            <div class="card">
+                <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+                    <h3>Original Report</h3>
+                    <div style="display:flex;gap:8px;">
+                        <a href="{% url 'article_detail' incident.primary_article.pk %}" style="font-size:12px;color:var(--accent-primary);">View Article</a>
+                        <a href="{{ incident.primary_article.url }}" target="_blank" style="font-size:12px;color:var(--text-muted);">Source &nearr;</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {% if incident.primary_article.image_url %}
+                    <div class="article-hero-image" style="margin-bottom:14px;">
+                        <img src="{{ incident.primary_article.image_url }}" alt="" style="max-width:100%;border-radius:var(--radius-md);border:1px solid var(--border-default);" loading="lazy" onerror="this.parentElement.style.display='none'" />
+                    </div>
+                    {% endif %}
+                    <h4 style="margin:0 0 8px 0;font-size:16px;">{{ incident.primary_article.title }}</h4>
+                    {% if incident.primary_article.tags_list %}
+                    <div style="margin-bottom:10px;">
+                        {% for tag in incident.primary_article.tags_list %}
+                        <span class="badge badge-category" style="font-size:10px;margin-right:4px;">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+                        {{ incident.primary_article.source.name }}
+                        {% if incident.primary_article.author %} &middot; {{ incident.primary_article.author }}{% endif %}
+                        {% if incident.primary_article.published_date %} &middot; {{ incident.primary_article.published_date|date:"M d, Y" }}{% endif %}
+                    </div>
+                    {% if incident.primary_article.summary %}
+                    <div class="article-summary-block" style="padding:12px;background:var(--bg-deep);border-radius:var(--radius-sm);margin-bottom:14px;font-size:13px;color:var(--text-secondary);line-height:1.5;">
+                        {{ incident.primary_article.summary }}
+                    </div>
+                    {% endif %}
+                    {% if incident.primary_article.content %}
+                    <div style="font-size:14px;line-height:1.7;color:var(--text-secondary);max-height:400px;overflow-y:auto;padding-right:8px;white-space:pre-wrap;">{{ incident.primary_article.content|truncatewords:500 }}</div>
+                    {% else %}
+                    <p style="color:var(--text-muted);font-size:13px;">No article content available.</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Source Articles (when more than one) -->
+            {% with source_articles=incident.get_source_articles %}
+            {% if source_articles|length > 1 %}
+            <div class="card">
+                <div class="card-header">
+                    <h3>Source Articles ({{ source_articles|length }})</h3>
+                </div>
+                <div class="card-body">
+                    <ul style="margin:0;padding-left:20px;font-size:14px;">
+                        {% for art in source_articles %}
+                        <li style="margin-bottom:8px;">
+                            <a href="{% url 'article_detail' art.pk %}" style="color:var(--accent-primary);">{{ art.title|truncatewords:12 }}</a>
+                            <span style="font-size:12px;color:var(--text-muted);"> — {{ art.source.name }}{% if art.published_date %} · {{ art.published_date|date:"M d, Y" }}{% endif %}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            <!-- AI Metadata -->
+            {% if incident.ai_incident_date or incident.ai_location_raw %}
+            <div class="card">
+                <div class="card-header"><h3>AI Extraction Metadata</h3></div>
+                <div class="card-body">
+                    <table style="width:100%;font-size:13px;">
+                        {% if incident.ai_incident_date %}
+                        <tr>
+                            <td style="color:var(--text-muted);padding:4px 0;width:120px;">AI Extracted Date</td>
+                            <td style="padding:4px 0;">{{ incident.ai_incident_date|date:"M d, Y H:i" }}
+                                {% if incident.incident_date %}
+                                {% if incident.ai_incident_date != incident.incident_date %}
+                                <span style="font-size:10px;color:#d97706;margin-left:6px;" title="AI date differs from article publish date">(differs from pub date)</span>
+                                {% else %}
+                                <span style="font-size:10px;color:#059669;margin-left:6px;">(matches)</span>
+                                {% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% if incident.ai_location_raw %}
+                        <tr>
+                            <td style="color:var(--text-muted);padding:4px 0;">AI Raw Location</td>
+                            <td style="padding:4px 0;">{{ incident.ai_location_raw }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if incident.ai_city %}
+                        <tr>
+                            <td style="color:var(--text-muted);padding:4px 0;">AI City</td>
+                            <td style="padding:4px 0;">{{ incident.ai_city }}</td>
+                        </tr>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Right Sidebar -->
+        <div>
+            <!-- Location Map -->
+            <div class="card" style="margin-bottom:16px;">
+                <div class="card-header">
+                    <h3>📍 Precise Location</h3>
+                </div>
+                <div class="card-body" style="padding:0;">
+                    {% if incident.latitude and incident.longitude %}
+                    <div id="detail-map"></div>
+                    <div style="padding:10px 14px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border-default);">
+                        <div>{{ incident.location_name|default:"Unknown" }}</div>
+                        <div id="detail-coords" style="font-family:var(--font-mono);font-size:11px;margin-top:2px;">
+                            {{ incident.latitude|floatformat:4 }}° N, {{ incident.longitude|floatformat:4 }}° W
+                        </div>
+                        {% if incident.ai_location_raw or incident.location_name %}
+                        <div style="margin-top:8px;">
+                            <button type="button" id="btn-regeocode" class="btn btn-secondary" style="font-size:11px;">Re-geocode Location</button>
+                            <span id="regeocode-msg" style="margin-left:8px;font-size:11px;"></span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="empty-state" style="padding:40px;">
+                        <div class="empty-icon">🗺️</div>
+                        <p>No coordinates available.</p>
+                        {% if incident.ai_location_raw or incident.location_name %}
+                        <div style="margin-top:12px;">
+                            <button type="button" id="btn-regeocode" class="btn btn-secondary" style="font-size:11px;">Re-geocode Location</button>
+                            <span id="regeocode-msg" style="margin-left:8px;font-size:11px;"></span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Nearby incidents count -->
+            <div class="card" style="margin-bottom:16px;">
+                <div class="card-header">
+                    <h3>📍 Nearby (30d)</h3>
+                </div>
+                <div class="card-body">
+                    <p style="margin:0;font-size:14px;font-weight:600;color:var(--text-primary);">{{ nearby_incidents_count }}</p>
+                    <p style="margin:4px 0 0;font-size:12px;color:var(--text-muted);">incidents in {{ incident.get_region_display }} in the last 30 days</p>
+                </div>
+            </div>
+
+            <!-- Location timeline -->
+            {% if location_timeline %}
+            <div class="card" style="margin-bottom:16px;">
+                <div class="card-header">
+                    <h3>🕐 Same Location Timeline</h3>
+                </div>
+                <div class="card-body timeline-list" style="padding:0;">
+                    {% for ev in location_timeline %}
+                    <a href="{% url 'incident_detail' ev.pk %}" class="timeline-item">
+                        <span class="timeline-dot"></span>
+                        <div class="timeline-content">
+                            <div class="timeline-title">{{ ev.incident_type|truncatechars:40 }}</div>
+                            <div class="timeline-meta">{% if ev.incident_date %}{{ ev.incident_date|date:"M d, Y H:i" }}{% else %}—{% endif %} · <span class="badge badge-{{ ev.severity }}" style="font-size:9px;">{{ ev.get_severity_display }}</span></div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Related Events -->
+            {% if related_incidents %}
+            <div class="card">
+                <div class="card-header">
+                    <h3>🔗 Related Events</h3>
+                </div>
+                <div class="card-body" style="padding:0;">
+                    {% for rel in related_incidents %}
+                    <a href="{% url 'incident_detail' rel.pk %}" style="display:block;padding:12px 14px;border-bottom:1px solid var(--border-default);text-decoration:none;color:inherit;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                            <div>
+                                <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:2px;">{{ rel.incident_type }}</div>
+                                <div style="font-size:12px;color:var(--text-muted);">
+                                    📍 {{ rel.location_name|default:"Unknown" }}
+                                </div>
+                            </div>
+                            <div style="text-align:right;">
+                                <span class="badge badge-{{ rel.severity }}" style="font-size:10px;">{{ rel.get_severity_display }}</span>
+                                {% if rel.incident_date %}
+                                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">{{ rel.incident_date|date:"M d" }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block inline_scripts %}
+{% if incident.latitude and incident.longitude %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        initDetailMap({{ incident.latitude }}, {{ incident.longitude }}, '{{ incident.incident_type|escapejs }}');
+    });
+</script>
+{% endif %}
+{% if incident.ai_location_raw or incident.location_name %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var btn = document.getElementById('btn-regeocode');
+        if (!btn) return;
+        var msgEl = document.getElementById('regeocode-msg');
+        var coordsEl = document.getElementById('detail-coords');
+        btn.addEventListener('click', function() {
+            btn.disabled = true;
+            btn.textContent = '…';
+            if (msgEl) msgEl.textContent = '';
+            fetch('{% url "api_regeocode_incident" incident.pk %}', {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json' }
+            }).then(function(r) { return r.json(); }).then(function(data) {
+                if (data.status === 'ok') {
+                    if (coordsEl) coordsEl.textContent = data.new_lat.toFixed(4) + '° N, ' + data.new_lng.toFixed(4) + '° W';
+                    if (msgEl) msgEl.textContent = data.moved_km != null ? 'Moved ' + data.moved_km + ' km' : 'Location unchanged';
+                    setTimeout(function() { window.location.reload(); }, 1500);
+                } else {
+                    if (msgEl) msgEl.textContent = data.message || 'Error';
+                    btn.disabled = false;
+                    btn.textContent = 'Re-geocode Location';
+                }
+            }).catch(function() {
+                if (msgEl) msgEl.textContent = 'Request failed';
+                btn.disabled = false;
+                btn.textContent = 'Re-geocode Location';
+            });
+        });
+    });
+</script>
+{% endif %}
+{% endblock %}

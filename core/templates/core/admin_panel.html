@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Status Summary Cards -->
+<div class="kpi-grid">
+    <div class="kpi-card warning">
+        <div class="kpi-icon">⏳</div>
+        <div class="kpi-content">
+            <div class="kpi-label">Pending Review</div>
+            <div class="kpi-value">{{ pending_count }}</div>
+        </div>
+    </div>
+    <div class="kpi-card success">
+        <div class="kpi-icon">✅</div>
+        <div class="kpi-content">
+            <div class="kpi-label">Approved</div>
+            <div class="kpi-value">{{ approved_count }}</div>
+        </div>
+    </div>
+    <div class="kpi-card danger">
+        <div class="kpi-icon">❌</div>
+        <div class="kpi-content">
+            <div class="kpi-label">Rejected</div>
+            <div class="kpi-value">{{ rejected_count }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs + Search Bar -->
+<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+    <div class="mod-tabs">
+        <a href="?status=pending{% if search %}&search={{ search }}{% endif %}" class="mod-tab {% if status_filter == 'pending' %}active{% endif %}">
+            Pending ({{ pending_count }})
+        </a>
+        <a href="?status=approved{% if search %}&search={{ search }}{% endif %}" class="mod-tab {% if status_filter == 'approved' %}active{% endif %}">
+            Approved
+        </a>
+        <a href="?status=rejected{% if search %}&search={{ search }}{% endif %}" class="mod-tab {% if status_filter == 'rejected' %}active{% endif %}">
+            Rejected
+        </a>
+        <a href="?status=all{% if search %}&search={{ search }}{% endif %}" class="mod-tab {% if status_filter == 'all' %}active{% endif %}">
+            All
+        </a>
+    </div>
+    <div style="display:flex;gap:8px;">
+        <form method="get" style="display:flex;gap:8px;">
+            <input type="hidden" name="status" value="{{ status_filter }}">
+            <input type="text" name="search" class="filter-input" placeholder="Search incidents..." value="{{ search }}" style="width:220px;">
+            <button type="submit" class="btn btn-sm">Search</button>
+        </form>
+        {% if status_filter == 'pending' and pending_count > 0 %}
+        <button class="btn btn-success btn-sm" onclick="batchAction('approve_all')">✅ Approve All</button>
+        <button class="btn btn-danger btn-sm" onclick="batchAction('reject_all')">❌ Reject All</button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 3-Column Layout: Queue | Article | AI Extraction -->
+<div style="display:grid;grid-template-columns:280px 1fr 340px;gap:16px;min-height:600px;">
+
+    <!-- Left: Pending Queue -->
+    <div class="card" style="overflow-y:auto;max-height:700px;">
+        <div style="padding:12px 14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1;">
+            <div style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);">Pending Review</div>
+            <div style="font-size:12px;color:var(--accent);margin-top:2px;">{{ total_count }} total</div>
+        </div>
+        {% for inc in incidents %}
+        <a href="?status={{ status_filter }}{% if search %}&search={{ search }}{% endif %}&selected={{ inc.pk }}"
+           style="display:block;padding:12px 14px;border-bottom:1px solid var(--border);text-decoration:none;color:inherit;
+                  {% if selected_incident and selected_incident.pk == inc.pk %}background:rgba(var(--accent-rgb,0,255,200),0.08);border-left:3px solid var(--accent);{% endif %}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+                <span class="badge badge-{{ inc.severity }}" style="font-size:10px;">{{ inc.get_severity_display }}</span>
+                {% if inc.incident_date %}
+                <span style="font-size:11px;color:var(--text-muted);">{{ inc.incident_date|timesince }} ago</span>
+                {% endif %}
+            </div>
+            <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:2px;">{{ inc.incident_type|truncatechars:40 }}</div>
+            <div style="font-size:12px;color:var(--text-muted);">📍 {{ inc.location_name|default:"Unknown"|truncatechars:30 }}</div>
+            {% if inc.article %}
+            <div style="margin-top:4px;">
+                <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:var(--surface-alt);color:var(--text-muted);">{{ inc.article.source.name }}</span>
+                {% if inc.confidence_score %}
+                <span style="font-size:10px;padding:2px 6px;border-radius:3px;background:{% if inc.confidence_score >= 80 %}rgba(16,185,129,0.15);color:#10b981{% elif inc.confidence_score >= 50 %}rgba(245,158,11,0.15);color:#f59e0b{% else %}rgba(239,68,68,0.15);color:#ef4444{% endif %}">
+                    {{ inc.confidence_score|floatformat:0 }}% Match
+                </span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </a>
+        {% empty %}
+        <div class="empty-state" style="padding:40px;">
+            <div class="empty-icon">📋</div>
+            <p>No incidents.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Center: Article Content -->
+    <div class="card" style="overflow-y:auto;max-height:700px;">
+        {% if selected_incident %}
+        <div style="padding:14px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--surface);z-index:1;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <span style="font-size:12px;font-family:var(--font-mono);color:var(--text-muted);">Incident #{{ selected_incident.pk }}</span>
+                    <span style="font-size:12px;color:var(--text-muted);margin-left:8px;">
+                        {% if selected_incident.primary_article %}
+                        Extracted from: {{ selected_incident.primary_article.source.name }}
+                        {% if selected_incident.incident_date %} • {{ selected_incident.incident_date|date:"M d, Y H:i" }}{% endif %}
+                        {% endif %}
+                    </span>
+                </div>
+                <div style="display:flex;gap:6px;">
+                    {% if selected_incident.status != 'approved' %}
+                    <button class="btn btn-success btn-sm" onclick="moderateIncident({{ selected_incident.pk }}, 'approve')">✅ Approve & Publish</button>
+                    {% endif %}
+                    {% if selected_incident.status != 'rejected' %}
+                    <button class="btn btn-danger btn-sm" onclick="moderateIncident({{ selected_incident.pk }}, 'reject')">❌ Reject</button>
+                    {% endif %}
+                    <button class="btn btn-sm" onclick="deleteIncident({{ selected_incident.pk }})" style="color:var(--text-muted);">🗑️ Delete</button>
+                </div>
+            </div>
+        </div>
+        <div style="padding:16px;">
+            {% if selected_incident.primary_article %}
+            <div style="display:inline-block;padding:4px 10px;background:rgba(0,200,150,0.12);border-radius:4px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--accent);margin-bottom:12px;">News Article</div>
+            <h2 style="margin:0 0 12px 0;font-size:18px;line-height:1.4;">{{ selected_incident.primary_article.title }}</h2>
+            <div style="font-size:14px;line-height:1.8;color:var(--text-secondary);white-space:pre-wrap;">{{ selected_incident.primary_article.content|truncatewords:600 }}</div>
+            {% else %}
+            <div class="empty-state" style="padding:40px;">
+                <div class="empty-icon">📰</div>
+                <p>No article content linked to this incident.</p>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="empty-state" style="padding:80px 40px;">
+            <div class="empty-icon">👈</div>
+            <p>Select an incident from the queue to review.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right: AI Extraction Results -->
+    <div style="display:flex;flex-direction:column;gap:16px;">
+        {% if selected_incident %}
+        <div class="card" style="overflow-y:auto;max-height:700px;">
+            <div style="padding:14px;border-bottom:1px solid var(--border);">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <h3 style="margin:0;font-size:14px;">🤖 AI Extraction Results</h3>
+                    {% if selected_incident.confidence_score %}
+                    <div style="text-align:right;">
+                        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);">Confidence</div>
+                        <div style="font-size:22px;font-weight:700;font-family:var(--font-mono);
+                                    color:{% if selected_incident.confidence_score >= 80 %}#10b981{% elif selected_incident.confidence_score >= 50 %}#f59e0b{% else %}#ef4444{% endif %};">
+                            {{ selected_incident.confidence_score|floatformat:0 }}%
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div style="padding:14px;">
+                <!-- Incident Type -->
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:4px;">Incident Type</label>
+                    <div class="filter-input" style="padding:8px 10px;">{{ selected_incident.incident_type }}</div>
+                </div>
+
+                <!-- Date & Time -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+                    <div>
+                        <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:4px;">Date</label>
+                        <div class="filter-input" style="padding:8px 10px;font-family:var(--font-mono);font-size:12px;">
+                            {% if selected_incident.incident_date %}{{ selected_incident.incident_date|date:"Y-m-d" }}{% else %}—{% endif %}
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:4px;">Time</label>
+                        <div class="filter-input" style="padding:8px 10px;font-family:var(--font-mono);font-size:12px;">
+                            {% if selected_incident.incident_date %}{{ selected_incident.incident_date|date:"H:i" }}{% else %}—{% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Location -->
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:4px;">Location (Extracted)</label>
+                    <div class="filter-input" style="padding:8px 10px;">{{ selected_incident.location_name|default:"—" }}</div>
+                </div>
+
+                <!-- Region -->
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:4px;">Region</label>
+                    <div class="filter-input" style="padding:8px 10px;">{{ selected_incident.get_region_display }}</div>
+                </div>
+
+                <!-- Severity Level -->
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:4px;">Severity Level</label>
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;">
+                        <div style="padding:6px;text-align:center;border-radius:4px;font-size:12px;
+                                    {% if selected_incident.severity == 'low' %}background:rgba(16,185,129,0.2);color:#10b981;font-weight:600{% else %}background:var(--surface-alt);color:var(--text-muted){% endif %}">Low</div>
+                        <div style="padding:6px;text-align:center;border-radius:4px;font-size:12px;
+                                    {% if selected_incident.severity == 'medium' %}background:rgba(245,158,11,0.2);color:#f59e0b;font-weight:600{% else %}background:var(--surface-alt);color:var(--text-muted){% endif %}">Med</div>
+                        <div style="padding:6px;text-align:center;border-radius:4px;font-size:12px;
+                                    {% if selected_incident.severity == 'high' %}background:rgba(239,68,68,0.2);color:#ef4444;font-weight:600{% else %}background:var(--surface-alt);color:var(--text-muted){% endif %}">High</div>
+                        <div style="padding:6px;text-align:center;border-radius:4px;font-size:12px;
+                                    {% if selected_incident.severity == 'critical' %}background:rgba(220,38,38,0.3);color:#dc2626;font-weight:600{% else %}background:var(--surface-alt);color:var(--text-muted){% endif %}">Crit</div>
+                    </div>
+                </div>
+
+                <!-- Category -->
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:4px;">Category</label>
+                    <div class="filter-input" style="padding:8px 10px;">
+                        <span class="badge badge-category">{{ selected_incident.get_category_display }}</span>
+                    </div>
+                </div>
+
+                <!-- Coordinates -->
+                {% if selected_incident.latitude %}
+                <div style="margin-bottom:14px;">
+                    <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:4px;">Coordinates</label>
+                    <div class="filter-input" style="padding:8px 10px;font-family:var(--font-mono);font-size:12px;">
+                        {{ selected_incident.latitude|floatformat:4 }}, {{ selected_incident.longitude|floatformat:4 }}
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- AI Summary -->
+                <div>
+                    <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:4px;">AI Generated Summary</label>
+                    <div style="padding:10px;background:var(--surface-alt);border-radius:6px;font-size:13px;line-height:1.6;color:var(--text-secondary);max-height:150px;overflow-y:auto;">
+                        {{ selected_incident.description|truncatewords:100 }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block inline_scripts %}
+<script>
+function moderateIncident(id, action) {
+    fetch('/api/incidents/' + id + '/moderate/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ action: action }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            location.reload();
+        } else {
+            alert('Error: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(err => alert('Failed: ' + err));
+}
+
+function batchAction(action) {
+    const label = action === 'approve_all' ? 'approve' : 'reject';
+    if (!confirm('Are you sure you want to ' + label + ' ALL pending incidents?')) return;
+
+    fetch('/api/incidents/batch-moderate/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ action: action, target: 'pending' }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        alert(data.count + ' incidents ' + label + 'd!');
+        location.reload();
+    })
+    .catch(err => alert('Failed: ' + err));
+}
+
+function deleteIncident(id) {
+    if (!confirm('Delete this incident permanently?')) return;
+    fetch('/api/incidents/' + id + '/delete/', { method: 'POST' })
+        .then(r => r.json())
+        .then(() => location.reload())
+        .catch(err => alert('Failed: ' + err));
+}
+</script>
+{% endblock %}

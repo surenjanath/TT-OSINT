@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Trinidad Incident Intelligence - Admin Moderation</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13c8ec",
+                        "background-light": "#f6f8f8",
+                        "background-dark": "#101f22",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #3b4f54; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
+<div class="relative flex h-screen w-full flex-col overflow-hidden">
+<!-- Top Navigation -->
+<header class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark px-6 py-3 shrink-0">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-3 text-primary">
+<span class="material-symbols-outlined text-3xl">radar</span>
+<h1 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-tight">Trinidad Intelligence</h1>
+</div>
+<nav class="flex items-center gap-6">
+<a class="text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-primary text-sm font-medium transition-colors" href="#">Dashboard</a>
+<a class="text-primary text-sm font-bold border-b-2 border-primary pb-1" href="#">Moderation Queue</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-primary text-sm font-medium transition-colors" href="#">Sources</a>
+<a class="text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-primary text-sm font-medium transition-colors" href="#">System Logs</a>
+</nav>
+</div>
+<div class="flex items-center gap-4">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">search</span>
+<input class="bg-slate-100 dark:bg-slate-800 border-none rounded-lg pl-9 pr-4 py-1.5 text-sm w-64 focus:ring-1 focus:ring-primary" placeholder="Search incidents..." type="text"/>
+</div>
+<button class="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-500 dark:text-slate-400 relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2 right-2 size-2 bg-red-500 rounded-full border-2 border-background-dark"></span>
+</button>
+<div class="size-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold text-xs border border-primary/30">JD</div>
+</div>
+</header>
+<div class="flex flex-1 overflow-hidden">
+<!-- Sidebar: Incident Queue -->
+<aside class="w-80 border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-[#0d181a] shrink-0">
+<div class="p-4 border-b border-slate-200 dark:border-slate-800">
+<div class="flex items-center justify-between mb-2">
+<h2 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Pending Review</h2>
+<span class="bg-primary/20 text-primary text-[10px] px-2 py-0.5 rounded-full font-bold">24 TOTAL</span>
+</div>
+<div class="flex gap-2">
+<button class="text-[11px] px-2 py-1 bg-primary text-background-dark font-bold rounded">All</button>
+<button class="text-[11px] px-2 py-1 bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-bold rounded">High Priority</button>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto custom-scrollbar">
+<!-- Queue Item Active -->
+<div class="p-4 border-b border-slate-200 dark:border-slate-800 bg-primary/10 border-l-4 border-l-primary cursor-pointer">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] text-primary font-bold uppercase">Breaking: Shooting</span>
+<span class="text-[10px] text-slate-500">2m ago</span>
+</div>
+<p class="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">Reported incident at Port of Spain docks involving...</p>
+<div class="flex items-center gap-2 mt-2">
+<span class="text-[10px] bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">Source: Express</span>
+<span class="text-[10px] text-green-500 font-bold">88% Match</span>
+</div>
+</div>
+<!-- Queue Item -->
+<div class="p-4 border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] text-slate-500 font-bold uppercase">Traffic Accident</span>
+<span class="text-[10px] text-slate-500">14m ago</span>
+</div>
+<p class="text-sm font-medium text-slate-600 dark:text-slate-300 leading-snug">Multiple vehicle collision on Uriah Butler Highway...</p>
+<div class="flex items-center gap-2 mt-2">
+<span class="text-[10px] bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">Source: Twitter</span>
+<span class="text-[10px] text-yellow-500 font-bold">62% Match</span>
+</div>
+</div>
+<!-- Queue Item -->
+<div class="p-4 border-b border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+<div class="flex justify-between items-start mb-1">
+<span class="text-[10px] text-slate-500 font-bold uppercase">Fire Report</span>
+<span class="text-[10px] text-slate-500">32m ago</span>
+</div>
+<p class="text-sm font-medium text-slate-600 dark:text-slate-300 leading-snug">Structure fire reported in San Fernando residential area...</p>
+<div class="flex items-center gap-2 mt-2">
+<span class="text-[10px] bg-slate-200 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500">Source: Fire Services</span>
+<span class="text-[10px] text-green-500 font-bold">94% Match</span>
+</div>
+</div>
+</div>
+</aside>
+<!-- Main Moderation View -->
+<main class="flex-1 flex flex-col overflow-hidden bg-background-light dark:bg-background-dark">
+<!-- Header Actions -->
+<div class="px-6 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+<div>
+<h2 class="text-xl font-bold">Incident #TR-94021</h2>
+<p class="text-xs text-slate-500">Extracted from: Guardian TT • 2023-11-24 14:12 AST</p>
+</div>
+<div class="flex gap-3">
+<button class="px-4 py-2 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 rounded-lg text-sm font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">copy_all</span> Merge Duplicate
+                    </button>
+<button class="px-4 py-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg text-sm font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">delete</span> Delete
+                    </button>
+<button class="px-4 py-2 bg-primary text-background-dark hover:brightness-110 rounded-lg text-sm font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">check_circle</span> Approve &amp; Publish
+                    </button>
+</div>
+</div>
+<!-- Content Split View -->
+<div class="flex-1 flex overflow-hidden">
+<!-- Left Column: Source Content -->
+<div class="flex-1 overflow-y-auto p-6 border-r border-slate-200 dark:border-slate-800 custom-scrollbar">
+<div class="bg-white dark:bg-slate-900/50 p-8 rounded-xl border border-slate-200 dark:border-slate-800">
+<div class="mb-6">
+<span class="bg-primary/10 text-primary text-[10px] font-bold px-2 py-1 rounded">NEWS ARTICLE</span>
+</div>
+<h3 class="text-2xl font-bold mb-4 leading-tight">Emergency units respond to reported shooting near Port of Spain Docks</h3>
+<div class="prose dark:prose-invert max-w-none text-slate-600 dark:text-slate-400 space-y-4">
+<p><strong>PORT OF SPAIN</strong> — At approximately 2:15 PM today, emergency services were dispatched to the vicinity of the Port of Spain docks following multiple reports of gunfire. Eyewitnesses suggest a confrontation broke out between several individuals near the main gate entrance.</p>
+<p>Preliminary reports from the Trinidad and Tobago Police Service (TTPS) indicate that at least two individuals have been transported to the hospital with non-life-threatening injuries. The area has been cordoned off as investigators collect forensic evidence.</p>
+<p>Traffic in the immediate area is heavily congested, and motorists are advised to seek alternative routes. Port operations remain active but under heightened security measures. No suspects have been apprehended at this time.</p>
+</div>
+<div class="mt-8 p-4 rounded-lg bg-slate-100 dark:bg-slate-800/50 border border-dashed border-slate-300 dark:border-slate-700">
+<p class="text-xs font-mono text-slate-500 mb-2 uppercase tracking-widest">Metadata</p>
+<div class="grid grid-cols-2 gap-4 text-xs font-mono">
+<div><span class="text-primary">URL:</span> guardian.co.tt/news/shooting-pos-docks</div>
+<div><span class="text-primary">LAT/LNG:</span> 10.6548, -61.5170</div>
+<div><span class="text-primary">TAGS:</span> crime, shooting, pos, emergency</div>
+<div><span class="text-primary">AUTHOR:</span> R. Singh</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column: AI Extraction Form -->
+<div class="w-[450px] overflow-y-auto p-6 bg-slate-50 dark:bg-[#0b1416] custom-scrollbar">
+<div class="flex items-center justify-between mb-6">
+<h3 class="font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">psychology</span> AI Extraction Results
+                        </h3>
+<div class="flex flex-col items-end">
+<span class="text-[10px] text-slate-500 uppercase font-bold">Confidence Score</span>
+<span class="text-xl font-bold text-green-400">88%</span>
+</div>
+</div>
+<div class="space-y-6">
+<!-- Field -->
+<div>
+<label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Incident Type</label>
+<select class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-primary focus:border-primary">
+<option>Shooting</option>
+<option>Traffic Accident</option>
+<option>Fire</option>
+<option>Robbery</option>
+<option>Civil Unrest</option>
+</select>
+</div>
+<!-- Field Group -->
+<div class="grid grid-cols-2 gap-4">
+<div>
+<label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Date</label>
+<input class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-primary" type="date" value="2023-11-24"/>
+</div>
+<div>
+<label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Time</label>
+<input class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-primary" type="time" value="14:15"/>
+</div>
+</div>
+<!-- Field -->
+<div>
+<label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Location (Extracted)</label>
+<div class="flex gap-2">
+<input class="flex-1 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-primary" type="text" value="Port of Spain Docks, Main Gate"/>
+<button class="p-2 bg-slate-200 dark:bg-slate-800 rounded-lg text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-sm">location_on</span>
+</button>
+</div>
+</div>
+<!-- Field -->
+<div>
+<label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">Severity Level</label>
+<div class="flex gap-2">
+<button class="flex-1 py-2 text-xs font-bold rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700">Low</button>
+<button class="flex-1 py-2 text-xs font-bold rounded-lg border border-yellow-500/50 bg-yellow-500/20 text-yellow-500">Medium</button>
+<button class="flex-1 py-2 text-xs font-bold rounded-lg border border-slate-700 bg-slate-800 text-slate-400 hover:bg-slate-700">High</button>
+</div>
+</div>
+<!-- Map Preview -->
+<div class="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 h-32 relative">
+<img alt="Map of Port of Spain" class="w-full h-full object-cover grayscale opacity-50" data-location="Port of Spain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC94DsZvKbzH0Qi3JI6X45FT31UhopTKmfbM75M7ZhfVqlg2hwS-Nw-0XlyPy9yIMoVuGrSaKobzi7EzDOAcRAjbdsCci9CepOOyrVSw0xP3VdAhIO-nYWVn78CDW3C9Jf0JqFO1xfFY9I0ltaeOjCKymDmHPWxJL9P1VjaOrTTWLou4LKCtjrtbzyM5LZlYXby13GuE20r_wSzsxJ6ESK8_U-QpAjLeGXNf8JcD-LwiJAxSw8QM-O14dutI_LOQCPGvyrEZ4VAtn3n"/>
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="material-symbols-outlined text-primary text-3xl">push_pin</span>
+</div>
+</div>
+<!-- Summary -->
+<div>
+<label class="block text-xs font-bold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">AI Generated Summary</label>
+<textarea class="w-full bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:ring-primary" rows="4">Reports of gunfire near Port of Spain docks at 14:15. Two casualties confirmed by TTPS, transported to hospital. Area cordoned off; major traffic delays on adjacent routes.</textarea>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer Section: System Health & Logs -->
+<section class="h-64 border-t border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-[#0d181a] shrink-0">
+<div class="flex border-b border-slate-200 dark:border-slate-800">
+<button class="px-6 py-3 text-xs font-bold text-primary border-b-2 border-primary">System Logs</button>
+<button class="px-6 py-3 text-xs font-bold text-slate-500">Source Health (RSS)</button>
+<button class="px-6 py-3 text-xs font-bold text-slate-500">Worker Status</button>
+</div>
+<div class="flex-1 grid grid-cols-2 overflow-hidden">
+<!-- Logs -->
+<div class="p-4 overflow-y-auto custom-scrollbar font-mono text-[10px] space-y-1">
+<div class="flex gap-4">
+<span class="text-slate-500">14:24:01</span>
+<span class="text-green-500">[INFO]</span>
+<span>Parsing worker #04 completed job TR-94021 from Guardian TT</span>
+</div>
+<div class="flex gap-4">
+<span class="text-slate-500">14:23:58</span>
+<span class="text-blue-500">[FETCH]</span>
+<span>RSS Poll: Trinidad Express (Status 200) - 0 new items</span>
+</div>
+<div class="flex gap-4">
+<span class="text-slate-500">14:22:15</span>
+<span class="text-yellow-500">[WARN]</span>
+<span>Confidence threshold low (58%) for article TR-94019</span>
+</div>
+<div class="flex gap-4">
+<span class="text-slate-500">14:20:01</span>
+<span class="text-green-500">[INFO]</span>
+<span>Geo-coder returned match for 'Port of Spain Docks'</span>
+</div>
+<div class="flex gap-4">
+<span class="text-slate-500">14:18:44</span>
+<span class="text-red-500">[ERROR]</span>
+<span>Failed to parse PDF source: Daily News Digest (Timeout)</span>
+</div>
+</div>
+<!-- Source Management -->
+<div class="p-4 border-l border-slate-200 dark:border-slate-800 grid grid-cols-2 gap-4">
+<div class="space-y-3">
+<h4 class="text-[10px] font-bold text-slate-500 uppercase">RSS Feed Health</h4>
+<div class="flex items-center justify-between text-[11px]">
+<span>Guardian TT</span>
+<span class="size-2 rounded-full bg-green-500"></span>
+</div>
+<div class="flex items-center justify-between text-[11px]">
+<span>Express TT</span>
+<span class="size-2 rounded-full bg-green-500"></span>
+</div>
+<div class="flex items-center justify-between text-[11px]">
+<span>Newsday</span>
+<span class="size-2 rounded-full bg-yellow-500 animate-pulse"></span>
+</div>
+</div>
+<div class="space-y-3">
+<h4 class="text-[10px] font-bold text-slate-500 uppercase">Parser Statistics</h4>
+<div class="text-[11px] flex justify-between">
+<span class="text-slate-500">Success Rate</span>
+<span class="font-bold">99.2%</span>
+</div>
+<div class="w-full bg-slate-800 h-1 rounded-full overflow-hidden">
+<div class="bg-primary h-full w-[99%]"></div>
+</div>
+<div class="text-[11px] flex justify-between mt-2">
+<span class="text-slate-500">Avg Processing Time</span>
+<span class="font-bold">4.2s</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+</main>
+</div>
+</div>
+</body></html>

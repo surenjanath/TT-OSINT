@@ -1,0 +1,126 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Trinidad & Tobago Crime and Incident Intelligence Map — Real-time AI-powered geospatial monitoring dashboard">
+
+    <title>{% block title %}{{ page_title|default:"Intelligence Map" }}{% endblock %} — TT OSINT</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{% static 'core/css/style.css' %}">
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+    <div class="app-layout">
+        <!-- ─── Sidebar ────────────────────────────────── -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <div class="brand-icon">🛡️</div>
+                <div class="brand-text">
+                    <span class="brand-name">TT OSINT</span>
+                    <span class="brand-subtitle">Intelligence Map</span>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section-label">Main</div>
+                <a href="{% url 'home' %}" class="nav-link {% if page_title == 'Intelligence Map' %}active{% endif %}">
+                    <span class="nav-icon">🗺️</span>
+                    National Map
+                </a>
+                <a href="{% url 'analytics' %}" class="nav-link {% if page_title == 'Analytics Dashboard' %}active{% endif %}">
+                    <span class="nav-icon">📊</span>
+                    Analytics
+                </a>
+                <a href="{% url 'timeline' %}" class="nav-link {% if page_title == 'Timeline Analysis' %}active{% endif %}">
+                    <span class="nav-icon">🕐</span>
+                    Timeline
+                </a>
+                <a href="{% url 'story_list' %}" class="nav-link {% if page_title == 'Stories' %}active{% endif %}">
+                    <span class="nav-icon">📚</span>
+                    Stories
+                </a>
+                <a href="{% url 'incident_list' %}" class="nav-link {% if page_title == 'Incident List' %}active{% endif %}">
+                    <span class="nav-icon">📋</span>
+                    Incident List
+                </a>
+                <a href="{% url 'article_list' %}" class="nav-link {% if page_title == 'News Feed' %}active{% endif %}">
+                    <span class="nav-icon">📰</span>
+                    News Feed
+                </a>
+
+                <div class="nav-section-label">Administration</div>
+                <a href="{% url 'admin_panel' %}" class="nav-link {% if page_title == 'Moderation Panel' %}active{% endif %}">
+                    <span class="nav-icon">⚙️</span>
+                    Moderation Panel
+                    {% if pending_count %}<span class="nav-badge">{{ pending_count }}</span>{% endif %}
+                </a>
+                <a href="{% url 'operations' %}" class="nav-link {% if page_title == 'Operations Center' %}active{% endif %}">
+                    <span class="nav-icon">🚀</span>
+                    Operations Center
+                </a>
+                <a href="{% url 'settings' %}" class="nav-link {% if page_title == 'System Settings' %}active{% endif %}">
+                    <span class="nav-icon">🎛️</span>
+                    System Settings
+                </a>
+                <a href="/django-admin/" class="nav-link">
+                    <span class="nav-icon">🔧</span>
+                    Django Admin
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="system-status">
+                    <span class="status-dot"></span>
+                    System Online
+                </div>
+            </div>
+        </aside>
+
+        <!-- ─── Main Content ───────────────────────────── -->
+        <div class="main-content">
+            <!-- Top Bar -->
+            <header class="top-bar">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
+                    <div class="page-title">
+                        <span class="title-dot"></span>
+                        {{ page_title|default:"Dashboard" }}
+                    </div>
+                </div>
+                <div class="top-bar-actions">
+                    <div class="live-badge">
+                        <span class="live-dot"></span>
+                        LIVE
+                    </div>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <main class="page-content">
+                {% block content %}{% endblock %}
+            </main>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+    <!-- Chart.js (only on analytics page) -->
+    {% block extra_scripts %}{% endblock %}
+
+    <!-- Main JS -->
+    <script src="{% static 'core/js/main.js' %}"></script>
+
+    {% block inline_scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Incident Analytics Dashboard | T.I.I.M.</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13c8ec",
+                        "background-light": "#f6f8f8",
+                        "background-dark": "#101f22",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(19, 200, 236, 0.05);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(19, 200, 236, 0.3);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display">
+<div class="relative flex min-h-screen w-full flex-col overflow-x-hidden">
+<!-- Top Navigation Bar -->
+<header class="flex items-center justify-between border-b border-slate-200 dark:border-primary/20 bg-background-light dark:bg-background-dark px-6 py-3 lg:px-10">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-3 text-primary">
+<span class="material-symbols-outlined text-3xl">radar</span>
+<h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-tight">T.I.I.M. Analytics</h2>
+</div>
+<nav class="hidden md:flex items-center gap-6">
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-primary text-sm font-medium transition-colors" href="#">Dashboard</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-primary text-sm font-medium transition-colors" href="#">Map View</a>
+<a class="text-primary text-sm font-semibold border-b-2 border-primary pb-1" href="#">Reports</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-primary text-sm font-medium transition-colors" href="#">Settings</a>
+</nav>
+</div>
+<div class="flex flex-1 justify-end gap-6 items-center">
+<div class="hidden sm:flex items-center bg-slate-100 dark:bg-primary/10 rounded px-3 py-1.5 border border-slate-200 dark:border-primary/20">
+<span class="material-symbols-outlined text-slate-500 dark:text-primary/70 text-lg">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-48 placeholder-slate-400 dark:placeholder-slate-500" placeholder="Search incidents..." type="text"/>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center justify-center p-2 rounded bg-slate-100 dark:bg-primary/10 text-slate-600 dark:text-slate-300 hover:bg-primary/20 transition-all">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="flex items-center justify-center p-2 rounded bg-slate-100 dark:bg-primary/10 text-slate-600 dark:text-slate-300 hover:bg-primary/20 transition-all">
+<span class="material-symbols-outlined">account_circle</span>
+</button>
+</div>
+</div>
+</header>
+<div class="flex flex-1">
+<!-- Sidebar Navigation -->
+<aside class="hidden lg:flex w-64 flex-col gap-4 border-r border-slate-200 dark:border-primary/20 p-6 bg-background-light dark:bg-background-dark">
+<div class="mb-4">
+<p class="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-primary/50">Command Menu</p>
+</div>
+<nav class="flex flex-col gap-2">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded hover:bg-primary/10 text-slate-700 dark:text-slate-300 transition-all group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">grid_view</span>
+<span class="text-sm font-medium">Overview</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded hover:bg-primary/10 text-slate-700 dark:text-slate-300 transition-all group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">explore</span>
+<span class="text-sm font-medium">Live Map</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded bg-primary text-white transition-all shadow-lg shadow-primary/20" href="#">
+<span class="material-symbols-outlined">insights</span>
+<span class="text-sm font-semibold">Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded hover:bg-primary/10 text-slate-700 dark:text-slate-300 transition-all group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">history</span>
+<span class="text-sm font-medium">Archives</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded hover:bg-primary/10 text-slate-700 dark:text-slate-300 transition-all group" href="#">
+<span class="material-symbols-outlined group-hover:text-primary">description</span>
+<span class="text-sm font-medium">Export Reports</span>
+</a>
+</nav>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 flex flex-col p-4 lg:p-8 gap-8 bg-slate-50 dark:bg-background-dark/50">
+<!-- KPI Header Section -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="flex flex-col gap-2 rounded-xl p-6 bg-white dark:bg-primary/5 border border-slate-200 dark:border-primary/20 shadow-sm">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Total Incidents Today</p>
+<span class="material-symbols-outlined text-primary">assessment</span>
+</div>
+<p class="text-slate-900 dark:text-slate-100 text-3xl font-bold">142</p>
+<div class="flex items-center gap-1.5 mt-2">
+<span class="material-symbols-outlined text-emerald-500 text-sm">trending_up</span>
+<p class="text-emerald-500 text-sm font-bold">+12.5%</p>
+<span class="text-slate-400 text-xs ml-1">from yesterday</span>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-6 bg-white dark:bg-primary/5 border border-slate-200 dark:border-primary/20 shadow-sm">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium">Weekly Change Rate</p>
+<span class="material-symbols-outlined text-primary">analytics</span>
+</div>
+<p class="text-slate-900 dark:text-slate-100 text-3xl font-bold">+4.2%</p>
+<div class="flex items-center gap-1.5 mt-2">
+<span class="material-symbols-outlined text-emerald-500 text-sm">arrow_upward</span>
+<p class="text-emerald-500 text-sm font-bold">In Target</p>
+<span class="text-slate-400 text-xs ml-1">vs forecast</span>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-6 bg-white dark:bg-primary/5 border border-slate-200 dark:border-primary/20 shadow-sm">
+<div class="flex justify-between items-start">
+<p class="text-slate-500 dark:text-slate-400 text-sm font-medium">High Severity Count</p>
+<span class="material-symbols-outlined text-orange-500">warning</span>
+</div>
+<p class="text-slate-900 dark:text-slate-100 text-3xl font-bold">28</p>
+<div class="flex items-center gap-1.5 mt-2">
+<span class="material-symbols-outlined text-rose-500 text-sm">trending_down</span>
+<p class="text-rose-500 text-sm font-bold">-2.1%</p>
+<span class="text-slate-400 text-xs ml-1">improving trend</span>
+</div>
+</div>
+</div>
+<!-- Incident Trends (Large Line Chart) -->
+<div class="rounded-xl border border-slate-200 dark:border-primary/20 bg-white dark:bg-primary/5 p-6 shadow-sm">
+<div class="flex items-center justify-between mb-8">
+<div>
+<h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Incident Trends (24h)</h3>
+<p class="text-slate-400 text-sm">Real-time throughput of recorded incidents across all sectors</p>
+</div>
+<div class="flex gap-2">
+<button class="px-3 py-1.5 text-xs font-semibold rounded bg-primary text-white">Daily</button>
+<button class="px-3 py-1.5 text-xs font-semibold rounded bg-slate-100 dark:bg-primary/10 text-slate-600 dark:text-slate-400">Weekly</button>
+</div>
+</div>
+<div class="relative w-full h-64">
+<svg class="w-full h-full" preserveaspectratio="none" viewbox="0 0 1000 200">
+<!-- Grid Lines -->
+<line stroke="rgba(19, 200, 236, 0.1)" stroke-width="1" x1="0" x2="1000" y1="50" y2="50"></line>
+<line stroke="rgba(19, 200, 236, 0.1)" stroke-width="1" x1="0" x2="1000" y1="100" y2="100"></line>
+<line stroke="rgba(19, 200, 236, 0.1)" stroke-width="1" x1="0" x2="1000" y1="150" y2="150"></line>
+<!-- Area Gradient Fill -->
+<path d="M0,150 C100,120 200,180 300,100 C400,20 500,80 600,120 C700,160 800,40 900,60 C1000,80 1000,200 0,200 Z" fill="url(#lineGradient)" opacity="0.2"></path>
+<!-- Trend Line -->
+<path d="M0,150 C100,120 200,180 300,100 C400,20 500,80 600,120 C700,160 800,40 900,60 C1000,80" fill="none" stroke="#13c8ec" stroke-linecap="round" stroke-width="3"></path>
+<defs>
+<lineargradient id="lineGradient" x1="0%" x2="0%" y1="0%" y2="100%">
+<stop offset="0%" style="stop-color:#13c8ec;stop-opacity:1"></stop>
+<stop offset="100%" style="stop-color:#13c8ec;stop-opacity:0"></stop>
+</lineargradient>
+</defs>
+</svg>
+<div class="flex justify-between mt-4 text-xs font-bold text-slate-400 uppercase tracking-tighter">
+<span>00:00</span>
+<span>04:00</span>
+<span>08:00</span>
+<span>12:00</span>
+<span>16:00</span>
+<span>20:00</span>
+<span>23:59</span>
+</div>
+</div>
+</div>
+<!-- Split View: Region Bar Chart and Category Donut -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+<!-- Region Chart -->
+<div class="rounded-xl border border-slate-200 dark:border-primary/20 bg-white dark:bg-primary/5 p-6 shadow-sm">
+<h3 class="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">Incidents by Region</h3>
+<div class="flex flex-col gap-5">
+<div class="space-y-2">
+<div class="flex justify-between text-sm">
+<span class="text-slate-400 font-medium">Port of Spain</span>
+<span class="text-slate-100 font-bold">42</span>
+</div>
+<div class="w-full bg-slate-200 dark:bg-primary/10 rounded-full h-2">
+<div class="bg-primary h-2 rounded-full shadow-[0_0_8px_rgba(19,200,236,0.5)]" style="width: 85%"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-sm">
+<span class="text-slate-400 font-medium">San Fernando</span>
+<span class="text-slate-100 font-bold">31</span>
+</div>
+<div class="w-full bg-slate-200 dark:bg-primary/10 rounded-full h-2">
+<div class="bg-primary h-2 rounded-full opacity-80" style="width: 65%"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-sm">
+<span class="text-slate-400 font-medium">Arima</span>
+<span class="text-slate-100 font-bold">24</span>
+</div>
+<div class="w-full bg-slate-200 dark:bg-primary/10 rounded-full h-2">
+<div class="bg-primary h-2 rounded-full opacity-60" style="width: 45%"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-sm">
+<span class="text-slate-400 font-medium">Chaguanas</span>
+<span class="text-slate-100 font-bold">18</span>
+</div>
+<div class="w-full bg-slate-200 dark:bg-primary/10 rounded-full h-2">
+<div class="bg-primary h-2 rounded-full opacity-40" style="width: 35%"></div>
+</div>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between text-sm">
+<span class="text-slate-400 font-medium">Point Fortin</span>
+<span class="text-slate-100 font-bold">12</span>
+</div>
+<div class="w-full bg-slate-200 dark:bg-primary/10 rounded-full h-2">
+<div class="bg-primary h-2 rounded-full opacity-20" style="width: 20%"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Category Breakdown (Donut Visualization) -->
+<div class="rounded-xl border border-slate-200 dark:border-primary/20 bg-white dark:bg-primary/5 p-6 shadow-sm flex flex-col">
+<h3 class="text-lg font-bold text-slate-900 dark:text-slate-100 mb-6">Incident Category Split</h3>
+<div class="flex flex-1 items-center justify-around">
+<div class="relative w-48 h-48">
+<svg class="w-full h-full transform -rotate-90" viewbox="0 0 100 100">
+<circle class="text-slate-100 dark:text-primary/10" cx="50" cy="50" fill="transparent" r="40" stroke="currentColor" stroke-width="12"></circle>
+<!-- Crime (40%) -->
+<circle class="opacity-100" cx="50" cy="50" fill="transparent" r="40" stroke="#13c8ec" stroke-dasharray="251.2" stroke-dashoffset="150.72" stroke-width="12"></circle>
+<!-- Accident (30%) -->
+<circle class="opacity-60" cx="50" cy="50" fill="transparent" r="40" stroke="#13c8ec" stroke-dasharray="251.2" stroke-dashoffset="175.84" stroke-width="12" transform="rotate(144 50 50)"></circle>
+<!-- Fire (20%) -->
+<circle class="opacity-30" cx="50" cy="50" fill="transparent" r="40" stroke="#13c8ec" stroke-dasharray="251.2" stroke-dashoffset="200.96" stroke-width="12" transform="rotate(252 50 50)"></circle>
+</svg>
+<div class="absolute inset-0 flex flex-col items-center justify-center">
+<span class="text-2xl font-bold">142</span>
+<span class="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Total</span>
+</div>
+</div>
+<div class="flex flex-col gap-3">
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-primary"></div>
+<span class="text-sm text-slate-400">Crime (40%)</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-primary opacity-60"></div>
+<span class="text-sm text-slate-400">Accident (30%)</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-primary opacity-30"></div>
+<span class="text-sm text-slate-400">Fire (20%)</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-3 h-3 rounded-full bg-slate-300 dark:bg-primary/10"></div>
+<span class="text-sm text-slate-400">Other (10%)</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Hotspot Areas Visualization -->
+<div class="rounded-xl border border-slate-200 dark:border-primary/20 bg-white dark:bg-primary/5 p-6 shadow-sm overflow-hidden">
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-lg font-bold text-slate-900 dark:text-slate-100">Regional Hotspot Density</h3>
+<button class="flex items-center gap-2 text-xs font-bold text-primary hover:underline">
+                            VIEW FULL HEATMAP <span class="material-symbols-outlined text-sm">open_in_new</span>
+</button>
+</div>
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+<!-- Map Preview -->
+<div class="xl:col-span-2 rounded-lg bg-slate-100 dark:bg-primary/10 min-h-[300px] overflow-hidden relative group">
+<img alt="Regional Map" class="w-full h-full object-cover grayscale opacity-50 contrast-125" data-alt="High contrast dark topographic map of Trinidad" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDSgG1I1F36KDIoy-JrW5yG_7G2j6xDkyKfA7hJPCWBU25wczzk0aELjw7oXqvDID4pdBfDjEecndD2BuT85TRivTJ6xss1NEg3g8s0fEUz5MtJqNc6_ZWB5DMYD95bey9wq6b5T3nhrbRU9q84BNAcYYTb29w37Smn-M6bZ3svkj81Sehs7acKLm-SwP15xDjeV47TUETHHOkyLAFIcUmkQK5jNTzpTyO3ae3kwcxvrGq03XaNw-6PwhhgMkOWrARKijdLSVW_2XKp"/>
+<!-- Simulated Heatmap Orbs -->
+<div class="absolute top-1/4 left-1/3 w-32 h-32 bg-primary/40 rounded-full blur-3xl"></div>
+<div class="absolute bottom-1/3 right-1/4 w-40 h-40 bg-rose-500/30 rounded-full blur-3xl"></div>
+<div class="absolute top-1/2 left-1/2 w-24 h-24 bg-primary/20 rounded-full blur-3xl"></div>
+<!-- Location Pins -->
+<div class="absolute top-1/4 left-1/3 transform -translate-x-1/2 -translate-y-1/2">
+<span class="material-symbols-outlined text-primary text-3xl animate-pulse">location_on</span>
+</div>
+<div class="absolute bottom-1/3 right-1/4 transform -translate-x-1/2 -translate-y-1/2">
+<span class="material-symbols-outlined text-rose-500 text-3xl animate-pulse">error</span>
+</div>
+<div class="absolute bottom-4 right-4 flex flex-col gap-1 items-end">
+<div class="bg-background-dark/80 backdrop-blur-md px-3 py-1 rounded text-[10px] text-white border border-primary/20">
+                                    LIVE MONITORING ACTIVE
+                                </div>
+<p class="text-[10px] text-slate-400 font-mono">LAT: 10.6918° N, LON: 61.2225° W</p>
+</div>
+</div>
+<!-- Table of Hotspot Areas -->
+<div class="flex flex-col gap-4">
+<h4 class="text-sm font-bold uppercase tracking-widest text-slate-500 dark:text-primary/50">Top Active Zones</h4>
+<div class="flex flex-col gap-3 custom-scrollbar overflow-y-auto max-h-[300px]">
+<div class="flex items-center justify-between p-3 rounded bg-slate-50 dark:bg-primary/10 border border-slate-200 dark:border-primary/10">
+<div class="flex flex-col">
+<span class="text-sm font-bold">Western Main Rd</span>
+<span class="text-xs text-slate-400">St. James</span>
+</div>
+<div class="px-2 py-1 rounded bg-rose-500/20 text-rose-400 text-[10px] font-bold">EXTREME</div>
+</div>
+<div class="flex items-center justify-between p-3 rounded bg-slate-50 dark:bg-primary/10 border border-slate-200 dark:border-primary/10">
+<div class="flex flex-col">
+<span class="text-sm font-bold">Independence Square</span>
+<span class="text-xs text-slate-400">Port of Spain</span>
+</div>
+<div class="px-2 py-1 rounded bg-orange-500/20 text-orange-400 text-[10px] font-bold">HIGH</div>
+</div>
+<div class="flex items-center justify-between p-3 rounded bg-slate-50 dark:bg-primary/10 border border-slate-200 dark:border-primary/10">
+<div class="flex flex-col">
+<span class="text-sm font-bold">High Street</span>
+<span class="text-xs text-slate-400">San Fernando</span>
+</div>
+<div class="px-2 py-1 rounded bg-orange-500/20 text-orange-400 text-[10px] font-bold">HIGH</div>
+</div>
+<div class="flex items-center justify-between p-3 rounded bg-slate-50 dark:bg-primary/10 border border-slate-200 dark:border-primary/10">
+<div class="flex flex-col">
+<span class="text-sm font-bold">Priority Bus Route</span>
+<span class="text-xs text-slate-400">Curepe Junction</span>
+</div>
+<div class="px-2 py-1 rounded bg-yellow-500/20 text-yellow-400 text-[10px] font-bold">MODERATE</div>
+</div>
+<div class="flex items-center justify-between p-3 rounded bg-slate-50 dark:bg-primary/10 border border-slate-200 dark:border-primary/10">
+<div class="flex flex-col">
+<span class="text-sm font-bold">S.S. Erin Road</span>
+<span class="text-xs text-slate-400">Debe</span>
+</div>
+<div class="px-2 py-1 rounded bg-yellow-500/20 text-yellow-400 text-[10px] font-bold">MODERATE</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+<!-- Footer Info Bar -->
+<footer class="border-t border-slate-200 dark:border-primary/20 bg-background-light dark:bg-background-dark px-6 py-2 flex justify-between items-center">
+<div class="flex items-center gap-4">
+<div class="flex items-center gap-1.5">
+<div class="w-2 h-2 rounded-full bg-emerald-500"></div>
+<span class="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400">System Healthy</span>
+</div>
+<span class="text-slate-300 dark:text-primary/20 text-[10px]">|</span>
+<span class="text-[10px] text-slate-400">Data Last Sync: Today 14:32:01 AST</span>
+</div>
+<div class="flex gap-4">
+<span class="text-[10px] text-slate-400">TRINIDAD INCIDENT INTELLIGENCE MAP v4.1.0-STABLE</span>
+</div>
+</footer>
+</div>
+</body></html>

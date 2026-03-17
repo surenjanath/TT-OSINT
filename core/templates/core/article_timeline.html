@@ -1,0 +1,748 @@
+{% extends "base.html" %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="tl-page">
+
+    <!-- Filter bar -->
+    <form method="get" class="card tl-filters">
+        <div class="tl-filters-row">
+            <div class="filter-group">
+                <label>From</label>
+                <input type="date" name="date_from" class="filter-input" value="{{ filters.date_from }}">
+            </div>
+            <div class="filter-group">
+                <label>To</label>
+                <input type="date" name="date_to" class="filter-input" value="{{ filters.date_to }}">
+            </div>
+            <div class="filter-group">
+                <label>Source</label>
+                <select name="source" class="filter-select">
+                    <option value="">All sources</option>
+                    {% for src in sources %}
+                    <option value="{{ src.pk }}" {% if filters.source == src.pk|stringformat:"d" %}selected{% endif %}>{{ src.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Category</label>
+                <select name="category" class="filter-select">
+                    <option value="">All categories</option>
+                    {% for val, label in category_choices %}
+                    <option value="{{ val }}" {% if filters.category == val %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="filter-group" style="flex:2;">
+                <label>Search</label>
+                <input type="text" name="search" class="filter-input" value="{{ filters.search }}" placeholder="Search articles...">
+            </div>
+            <div class="filter-group" style="align-self:flex-end;">
+                <button type="submit" class="btn btn-primary">Apply</button>
+                <a href="{% url 'timeline' %}" class="btn btn-sm" style="margin-left:4px;">Reset</a>
+            </div>
+        </div>
+    </form>
+
+    <!-- Main layout: map + detail panel -->
+    <div class="tl-main">
+        <!-- Map -->
+        <div class="tl-map-wrap" id="tl-map-wrap">
+            <div id="tl-map"></div>
+
+            <!-- Running stats overlay (top-right) -->
+            <div class="tl-stats" id="tl-stats">
+                <div class="tl-stat"><span class="tl-stat-val" id="stat-articles">0</span><span class="tl-stat-label">Articles</span></div>
+                <div class="tl-stat"><span class="tl-stat-val" id="stat-incidents">0</span><span class="tl-stat-label">Incidents</span></div>
+                <div class="tl-stat"><span class="tl-stat-val" id="stat-victims">0</span><span class="tl-stat-label">Victims</span></div>
+                <div class="tl-stat"><span class="tl-stat-val tl-stat-deaths" id="stat-deaths">0</span><span class="tl-stat-label">Deaths</span></div>
+            </div>
+
+            <!-- Current timestamp (top-left) -->
+            <div class="tl-timestamp" id="tl-timestamp"></div>
+
+            <!-- Map toolbar (top-center) -->
+            <div class="tl-toolbar">
+                <button class="tl-tb-btn" id="btn-map-style" title="Map style">🗺️</button>
+                <label class="tl-tb-toggle" title="Skip articles with no incidents">
+                    <input type="checkbox" id="chk-skip-empty">
+                    <span>Incidents only</span>
+                </label>
+                <label class="tl-tb-toggle" title="Fade older markers">
+                    <input type="checkbox" id="chk-fade" checked>
+                    <span>Fade old</span>
+                </label>
+                <button class="tl-tb-btn" id="btn-fullscreen" title="Fullscreen (F)">&#x26F6;</button>
+            </div>
+
+            <!-- Map legend (bottom-left) -->
+            <div class="tl-legend">
+                <div class="tl-legend-row"><span class="tl-legend-dot" style="background:#22c55e;"></span>Low</div>
+                <div class="tl-legend-row"><span class="tl-legend-dot" style="background:#eab308;"></span>Medium</div>
+                <div class="tl-legend-row"><span class="tl-legend-dot" style="background:#f97316;"></span>High</div>
+                <div class="tl-legend-row"><span class="tl-legend-dot" style="background:#ef4444;"></span>Critical</div>
+            </div>
+
+            <!-- Density sparkline (above playback bar) -->
+            <canvas id="tl-density" class="tl-density"></canvas>
+
+            <!-- Playback controls overlay -->
+            <div class="tl-playback">
+                <button class="tl-play-btn" id="btn-play" title="Play / Pause (Space)">&#9654;</button>
+                <button class="tl-play-btn tl-step-btn" id="btn-step-back" title="Step back (Left)">&#9664;</button>
+                <div class="tl-slider-wrap">
+                    <input type="range" id="tl-slider" class="tl-slider" min="0" max="0" value="0">
+                    <div class="tl-progress" id="tl-progress"></div>
+                </div>
+                <button class="tl-play-btn tl-step-btn" id="btn-step-fwd" title="Step forward (Right)">&#9654;</button>
+                <span class="tl-counter" id="tl-counter">0 / 0</span>
+                <span class="tl-pct" id="tl-pct">0%</span>
+                <select id="tl-speed" class="tl-speed-select" title="Playback speed">
+                    <option value="2000">0.5x</option>
+                    <option value="1000" selected>1x</option>
+                    <option value="400">2x</option>
+                    <option value="150">5x</option>
+                    <option value="50">10x</option>
+                </select>
+                <button class="tl-play-btn" id="btn-reset" title="Reset (R)">&#x21BA;</button>
+            </div>
+        </div>
+
+        <!-- Detail panel (right sidebar) -->
+        <div class="tl-detail" id="tl-detail">
+            <!-- Placeholder -->
+            <div class="tl-detail-placeholder" id="tl-detail-placeholder">
+                <div style="font-size:36px;opacity:0.3;margin-bottom:12px;">🕐</div>
+                <p><strong>{{ total_articles }}</strong> article{{ total_articles|pluralize }}, <strong>{{ total_incidents }}</strong> incident{{ total_incidents|pluralize }}</p>
+                <p style="font-size:12px;">{{ filters.date_from }} &mdash; {{ filters.date_to }}</p>
+                <p style="font-size:12px;margin-top:12px;">Press <strong>Play</strong> or <strong>Space</strong> to animate.<br>Use <strong>&larr; &rarr;</strong> to step. <strong>R</strong> to reset. <strong>F</strong> for fullscreen.</p>
+            </div>
+
+            <!-- Active event detail -->
+            <div id="tl-detail-content" style="display:none;">
+                <div class="tl-detail-article" id="tl-detail-article">
+                    <div class="tl-detail-time" id="detail-time"></div>
+                    <h3 class="tl-detail-title" id="detail-title"></h3>
+                    <div class="tl-detail-meta" id="detail-meta"></div>
+                    <p class="tl-detail-summary" id="detail-summary"></p>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <a href="#" class="btn btn-sm btn-primary" id="detail-link" target="_blank">Read original</a>
+                        <a href="#" class="btn btn-sm" id="detail-article-link">View article</a>
+                        <a href="#" class="btn btn-sm" id="detail-extraction-link" style="display:none;">Extraction detail</a>
+                    </div>
+                </div>
+                <div id="tl-detail-incidents" style="overflow-y:auto;"></div>
+            </div>
+
+            <!-- End-of-playback summary -->
+            <div id="tl-summary-card" class="tl-summary-card" style="display:none;">
+                <h3 class="tl-summary-title">Playback complete</h3>
+                <div class="tl-summary-grid" id="tl-summary-grid"></div>
+                <div class="tl-summary-section" id="tl-summary-severity"></div>
+                <div class="tl-summary-section" id="tl-summary-categories"></div>
+                <div class="tl-summary-section" id="tl-summary-locations"></div>
+                <button class="btn btn-sm btn-primary" onclick="document.getElementById('btn-reset').click();" style="margin-top:12px;width:100%;">Replay</button>
+            </div>
+
+            <!-- Event log -->
+            <div class="tl-log" id="tl-log">
+                <div class="tl-log-header">
+                    <h4 class="tl-log-title">Event log</h4>
+                    <span class="tl-log-count" id="tl-log-count">0</span>
+                </div>
+                <div id="tl-log-entries"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tl-page { display: flex; flex-direction: column; gap: 12px; }
+.tl-filters { padding: 14px 20px; margin-bottom: 0; }
+.tl-filters-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.tl-filters-row .filter-group { flex: 1; min-width: 120px; }
+.tl-filters-row .filter-group label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); margin-bottom: 4px; display: block; }
+
+.tl-main { display: grid; grid-template-columns: 1fr 400px; gap: 12px; height: calc(100vh - 220px); min-height: 520px; }
+@media (max-width: 960px) { .tl-main { grid-template-columns: 1fr; height: auto; } }
+
+/* Map */
+.tl-map-wrap { position: relative; border-radius: var(--radius-lg); overflow: hidden; background: #0d1117; }
+.tl-map-wrap.tl-fullscreen { position: fixed !important; top: 0; left: 0; right: 0; bottom: 0; z-index: 9999; border-radius: 0; }
+#tl-map { width: 100%; height: 100%; min-height: 420px; }
+
+/* Stats */
+.tl-stats { position: absolute; top: 12px; right: 12px; z-index: 1000; display: flex; gap: 2px; }
+.tl-stat { background: rgba(15,15,20,0.85); backdrop-filter: blur(6px); padding: 6px 12px; text-align: center; }
+.tl-stat:first-child { border-radius: 8px 0 0 8px; }
+.tl-stat:last-child { border-radius: 0 8px 8px 0; }
+.tl-stat-val { display: block; font-size: 16px; font-weight: 700; color: #fff; font-family: var(--font-mono); transition: transform 0.2s; }
+.tl-stat-val.tl-bump { transform: scale(1.3); }
+.tl-stat-deaths { color: #ef4444; }
+.tl-stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: rgba(255,255,255,0.5); }
+
+/* Timestamp */
+.tl-timestamp { position: absolute; top: 12px; left: 12px; z-index: 1000; background: rgba(15,15,20,0.88); backdrop-filter: blur(6px); color: #fff; padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 700; display: none; letter-spacing: -0.01em; }
+
+/* Toolbar */
+.tl-toolbar { position: absolute; top: 50px; left: 12px; z-index: 1000; display: flex; gap: 4px; align-items: center; }
+.tl-tb-btn { background: rgba(15,15,20,0.82); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.08); color: #fff; width: 32px; height: 32px; border-radius: 6px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; transition: background 0.15s; }
+.tl-tb-btn:hover { background: rgba(40,40,60,0.9); }
+.tl-tb-toggle { background: rgba(15,15,20,0.82); backdrop-filter: blur(6px); border: 1px solid rgba(255,255,255,0.08); color: rgba(255,255,255,0.65); font-size: 10px; padding: 6px 10px; border-radius: 6px; cursor: pointer; display: flex; align-items: center; gap: 5px; user-select: none; }
+.tl-tb-toggle input { width: 12px; height: 12px; margin: 0; accent-color: var(--accent-primary); }
+
+/* Legend */
+.tl-legend { position: absolute; bottom: 100px; left: 12px; z-index: 1000; background: rgba(15,15,20,0.82); backdrop-filter: blur(6px); padding: 8px 12px; border-radius: 8px; }
+.tl-legend-row { display: flex; align-items: center; gap: 6px; font-size: 10px; color: rgba(255,255,255,0.65); padding: 1px 0; }
+.tl-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* Density sparkline */
+.tl-density { position: absolute; bottom: 52px; left: 12px; right: 12px; height: 24px; z-index: 1000; pointer-events: none; }
+
+/* Playback bar */
+.tl-playback { position: absolute; bottom: 12px; left: 12px; right: 12px; z-index: 1000; display: flex; align-items: center; gap: 6px; background: rgba(15,15,20,0.92); backdrop-filter: blur(10px); padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06); }
+.tl-play-btn { background: none; border: none; color: #fff; font-size: 18px; cursor: pointer; width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; border-radius: 7px; transition: background 0.15s; flex-shrink: 0; }
+.tl-play-btn:hover { background: rgba(255,255,255,0.12); }
+.tl-step-btn { font-size: 12px; width: 28px; height: 28px; }
+.tl-slider-wrap { flex: 1; position: relative; }
+.tl-slider { width: 100%; accent-color: var(--accent-primary); cursor: pointer; height: 6px; position: relative; z-index: 2; }
+.tl-progress { position: absolute; bottom: 0; left: 0; height: 3px; background: var(--accent-primary); border-radius: 2px; transition: width 0.15s; pointer-events: none; z-index: 1; opacity: 0.4; }
+.tl-counter { font-size: 11px; color: rgba(255,255,255,0.6); font-family: var(--font-mono); white-space: nowrap; min-width: 60px; text-align: center; }
+.tl-pct { font-size: 10px; color: rgba(255,255,255,0.4); font-family: var(--font-mono); min-width: 32px; text-align: center; }
+.tl-speed-select { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.12); color: #fff; border-radius: 5px; font-size: 11px; padding: 4px 8px; cursor: pointer; }
+.tl-speed-select option { background: #1a1a2e; color: #fff; }
+
+/* Detail panel */
+.tl-detail { background: var(--bg-elevated); border: 1px solid var(--border-default); border-radius: var(--radius-lg); display: flex; flex-direction: column; overflow: hidden; }
+.tl-detail-placeholder { padding: 40px 24px; text-align: center; color: var(--text-muted); font-size: 13px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.tl-detail-article { padding: 16px 18px; border-bottom: 1px solid var(--border-default); }
+.tl-detail-time { font-size: 11px; font-family: var(--font-mono); color: var(--accent-primary); margin-bottom: 6px; font-weight: 600; }
+.tl-detail-title { font-size: 15px; font-weight: 700; margin: 0 0 8px; line-height: 1.3; color: var(--text-primary); }
+.tl-detail-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.tl-detail-summary { font-size: 13px; line-height: 1.55; color: var(--text-secondary); margin: 0 0 12px; }
+
+/* Incident cards */
+.tl-inc-card { padding: 14px 18px; border-bottom: 1px solid var(--border-subtle); cursor: pointer; transition: background 0.12s; }
+.tl-inc-card:hover { background: var(--bg-hover); }
+.tl-inc-card:last-child { border-bottom: 1px solid var(--border-default); }
+.tl-inc-card.tl-inc-active { background: rgba(59,130,246,0.06); border-left: 3px solid var(--accent-primary); }
+.tl-inc-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.tl-inc-type { font-weight: 600; font-size: 14px; }
+.tl-inc-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin: 0; }
+.tl-inc-details { font-size: 11px; color: var(--text-muted); margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap; }
+.tl-inc-link { font-size: 11px; color: var(--accent-primary); text-decoration: none; margin-top: 6px; display: inline-block; }
+.tl-inc-link:hover { text-decoration: underline; }
+
+/* Summary card */
+.tl-summary-card { padding: 20px 18px; overflow-y: auto; }
+.tl-summary-title { margin: 0 0 14px; font-size: 16px; font-weight: 700; color: var(--text-primary); text-align: center; }
+.tl-summary-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+.tl-summary-kpi { background: var(--bg-hover); border-radius: 8px; padding: 10px; text-align: center; }
+.tl-summary-kpi-val { font-size: 22px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); }
+.tl-summary-kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.tl-summary-section { margin-bottom: 12px; }
+.tl-summary-section h4 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 0 0 6px; }
+.tl-summary-bar { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 4px; }
+.tl-summary-bar-fill { height: 6px; border-radius: 3px; transition: width 0.3s; }
+.tl-summary-bar-label { min-width: 80px; color: var(--text-secondary); }
+.tl-summary-bar-count { font-family: var(--font-mono); color: var(--text-muted); min-width: 24px; text-align: right; font-size: 11px; }
+
+/* Event log */
+.tl-log { flex: 1; overflow-y: auto; padding: 0; min-height: 0; }
+.tl-log-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 18px 6px; position: sticky; top: 0; background: var(--bg-elevated); z-index: 1; }
+.tl-log-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); margin: 0; }
+.tl-log-count { font-size: 10px; color: var(--text-muted); font-family: var(--font-mono); background: var(--bg-hover); padding: 2px 8px; border-radius: 10px; }
+.tl-log-entry { padding: 8px 18px; border-bottom: 1px solid var(--border-subtle); font-size: 12px; display: flex; gap: 8px; align-items: flex-start; cursor: pointer; transition: background 0.1s; }
+.tl-log-entry:hover { background: var(--bg-hover); }
+.tl-log-entry.active { background: rgba(59,130,246,0.08); border-left: 3px solid var(--accent-primary); }
+.tl-log-time { color: var(--text-muted); font-family: var(--font-mono); font-size: 10px; white-space: nowrap; min-width: 56px; padding-top: 1px; }
+.tl-log-body { flex: 1; min-width: 0; }
+.tl-log-article-title { font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-log-inc { color: var(--text-muted); font-size: 11px; }
+.tl-log-inc-sev { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 3px; vertical-align: middle; }
+</style>
+
+{% block inline_scripts %}
+<script>
+(function() {
+    var events = {{ timeline_events_json|safe }};
+    var currentIdx = -1;
+    var playing = false;
+    var playTimer = null;
+    var allMarkers = []; // {marker, eventIdx, incIdx, inc}
+    var pulseTimers = [];
+    var logCount = 0;
+    var skipEmpty = false;
+    var fadeOld = true;
+
+    var runArticles = 0, runIncidents = 0, runVictims = 0, runDeaths = 0;
+    var sevTally = {}, catTally = {}, locTally = {};
+
+    // Map layers
+    var darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; CARTO', subdomains: 'abcd', maxZoom: 19
+    });
+    var lightLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; CARTO', subdomains: 'abcd', maxZoom: 19
+    });
+    var satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        attribution: '&copy; Esri', maxZoom: 19
+    });
+    var mapStyles = [darkLayer, lightLayer, satLayer];
+    var mapStyleNames = ['Dark', 'Light', 'Satellite'];
+    var mapStyleIdx = 0;
+
+    var map = L.map('tl-map', { zoomControl: false }).setView([10.45, -61.25], 10);
+    darkLayer.addTo(map);
+    L.control.zoom({ position: 'bottomleft' }).addTo(map);
+
+    // DOM refs
+    var slider = document.getElementById('tl-slider');
+    var counter = document.getElementById('tl-counter');
+    var pctEl = document.getElementById('tl-pct');
+    var progressEl = document.getElementById('tl-progress');
+    var btnPlay = document.getElementById('btn-play');
+    var btnReset = document.getElementById('btn-reset');
+    var btnStepBack = document.getElementById('btn-step-back');
+    var btnStepFwd = document.getElementById('btn-step-fwd');
+    var speedSel = document.getElementById('tl-speed');
+    var tsEl = document.getElementById('tl-timestamp');
+    var placeholder = document.getElementById('tl-detail-placeholder');
+    var detailContent = document.getElementById('tl-detail-content');
+    var summaryCard = document.getElementById('tl-summary-card');
+    var logEntries = document.getElementById('tl-log-entries');
+
+    slider.max = Math.max(0, events.length - 1);
+    counter.textContent = '0 / ' + events.length;
+
+    var severityColors = { low: '#22c55e', medium: '#eab308', high: '#f97316', critical: '#ef4444' };
+    var severityRadius = { low: 5, medium: 7, high: 9, critical: 12 };
+
+    // --- Density sparkline ---
+    (function drawDensity() {
+        var canvas = document.getElementById('tl-density');
+        if (!canvas || !events.length) return;
+        var ctx = canvas.getContext('2d');
+        var buckets = 80;
+        var counts = new Array(buckets).fill(0);
+        for (var i = 0; i < events.length; i++) {
+            var b = Math.floor(i / events.length * buckets);
+            if (b >= buckets) b = buckets - 1;
+            counts[b] += events[i].incidents.length;
+        }
+        var maxC = Math.max.apply(null, counts) || 1;
+        function render() {
+            canvas.width = canvas.offsetWidth * 2;
+            canvas.height = canvas.offsetHeight * 2;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            var barW = canvas.width / buckets;
+            for (var i = 0; i < buckets; i++) {
+                var h = (counts[i] / maxC) * canvas.height * 0.9;
+                var r = counts[i] / maxC;
+                ctx.fillStyle = 'rgba(' + Math.round(59 + r*196) + ',' + Math.round(130 - r*80) + ',' + Math.round(246 - r*200) + ',0.5)';
+                ctx.fillRect(i * barW, canvas.height - h, barW - 1, h);
+            }
+        }
+        render();
+        window.addEventListener('resize', render);
+    })();
+
+    // --- Helpers ---
+    function formatTime(s) { if (!s) return ''; var d = new Date(s); return d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'})+' \u2022 '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+    function shortTime(s) { if (!s) return ''; var d = new Date(s); return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+    function shortDate(s) { if (!s) return ''; var d = new Date(s); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+    function cap(s) { return s ? s.charAt(0).toUpperCase()+s.slice(1) : ''; }
+    function escHtml(t) { if (!t) return ''; var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
+
+    function updateProgress() {
+        var pct = events.length > 0 ? Math.round((currentIdx + 1) / events.length * 100) : 0;
+        pctEl.textContent = pct + '%';
+        progressEl.style.width = pct + '%';
+    }
+
+    function bumpStat(id) {
+        var el = document.getElementById(id);
+        el.classList.add('tl-bump');
+        setTimeout(function() { el.classList.remove('tl-bump'); }, 250);
+    }
+
+    function updateStats() {
+        var prev = {
+            a: document.getElementById('stat-articles').textContent,
+            i: document.getElementById('stat-incidents').textContent,
+            v: document.getElementById('stat-victims').textContent,
+            d: document.getElementById('stat-deaths').textContent
+        };
+        document.getElementById('stat-articles').textContent = runArticles;
+        document.getElementById('stat-incidents').textContent = runIncidents;
+        document.getElementById('stat-victims').textContent = runVictims;
+        document.getElementById('stat-deaths').textContent = runDeaths;
+        if (String(runArticles) !== prev.a) bumpStat('stat-articles');
+        if (String(runIncidents) !== prev.i) bumpStat('stat-incidents');
+        if (String(runVictims) !== prev.v) bumpStat('stat-victims');
+        if (String(runDeaths) !== prev.d) bumpStat('stat-deaths');
+    }
+
+    function computeRunningStats(upToIdx) {
+        runArticles = upToIdx + 1;
+        var ti = 0, tv = 0, td = 0;
+        sevTally = {}; catTally = {}; locTally = {};
+        for (var e = 0; e <= upToIdx; e++) {
+            for (var j = 0; j < events[e].incidents.length; j++) {
+                var inc = events[e].incidents[j];
+                ti++;
+                tv += inc.victim_count || 0;
+                td += inc.fatality_count || 0;
+                sevTally[inc.severity] = (sevTally[inc.severity] || 0) + 1;
+                catTally[inc.category] = (catTally[inc.category] || 0) + 1;
+                if (inc.location_name) locTally[inc.location_name] = (locTally[inc.location_name] || 0) + 1;
+            }
+        }
+        runIncidents = ti; runVictims = tv; runDeaths = td;
+    }
+
+    // --- Marker fade ---
+    function fadeMarkers(currentEventIdx) {
+        if (!fadeOld) {
+            allMarkers.forEach(function(m) { m.marker.setStyle({ opacity: 0.9, fillOpacity: 0.65 }); });
+            return;
+        }
+        allMarkers.forEach(function(m) {
+            var age = currentEventIdx - m.eventIdx;
+            var opacity = age <= 0 ? 0.9 : Math.max(0.12, 0.9 - age * 0.04);
+            var fillOp = age <= 0 ? 0.65 : Math.max(0.08, 0.65 - age * 0.03);
+            m.marker.setStyle({ opacity: opacity, fillOpacity: fillOp });
+        });
+    }
+
+    function createPopupHtml(inc) {
+        return '<div style="min-width:180px;font-size:12px;line-height:1.5;">' +
+            '<strong style="font-size:13px;">' + escHtml(inc.incident_type) + '</strong>' +
+            '<span class="badge badge-' + inc.severity + '" style="margin-left:6px;font-size:10px;vertical-align:middle;">' + cap(inc.severity) + '</span><br>' +
+            (inc.location_name ? '<span style="color:#94a3b8;">\uD83D\uDCCD ' + escHtml(inc.location_name) + '</span><br>' : '') +
+            '<span style="color:#64748b;">' + escHtml(inc.region) + '</span><br>' +
+            '<span style="color:#64748b;">Confidence: ' + inc.confidence + '%</span>' +
+            (inc.victim_count ? '<br><span style="color:#f97316;">Victims: ' + inc.victim_count + '</span>' : '') +
+            (inc.fatality_count ? '<br><span style="color:#ef4444;font-weight:600;">Deaths: ' + inc.fatality_count + '</span>' : '') +
+            (inc.weapon ? '<br><span style="color:#94a3b8;">Weapon: ' + escHtml(inc.weapon) + '</span>' : '') +
+            '<br><a href="/incidents/' + inc.id + '/" style="color:#3b82f6;font-size:11px;">View incident \u2192</a>' +
+        '</div>';
+    }
+
+    function addMarker(inc, eventIdx, incIdx, animate) {
+        if (!inc.lat || !inc.lng) return null;
+        var color = severityColors[inc.severity] || '#6b7280';
+        var radius = severityRadius[inc.severity] || 6;
+        var marker = L.circleMarker([inc.lat, inc.lng], {
+            radius: radius, fillColor: color, color: color,
+            weight: 2, opacity: 0.9, fillOpacity: 0.65
+        }).addTo(map);
+        marker.bindPopup(createPopupHtml(inc), { maxWidth: 280 });
+        marker._tlEventIdx = eventIdx;
+        marker._tlIncIdx = incIdx;
+
+        // Clicking a marker highlights it in the detail panel
+        marker.on('click', function() {
+            if (eventIdx !== currentIdx) showEvent(eventIdx, true);
+            var cards = document.querySelectorAll('#tl-detail-incidents .tl-inc-card');
+            cards.forEach(function(c) { c.classList.remove('tl-inc-active'); });
+            var target = document.querySelector('#tl-detail-incidents .tl-inc-card[data-inc-idx="' + incIdx + '"]');
+            if (target) { target.classList.add('tl-inc-active'); target.scrollIntoView({ block: 'nearest' }); }
+        });
+
+        allMarkers.push({ marker: marker, eventIdx: eventIdx, incIdx: incIdx, inc: inc });
+
+        if (animate) {
+            marker.openPopup();
+            var ring = L.circleMarker([inc.lat, inc.lng], {
+                radius: radius * 3, fillColor: color, color: color,
+                weight: 1, opacity: 0.5, fillOpacity: 0.15,
+            }).addTo(map);
+            var t = setTimeout(function() { try { map.removeLayer(ring); } catch(e){} }, 1200);
+            pulseTimers.push(t);
+        }
+        return marker;
+    }
+
+    function showEvent(idx, skipAnim) {
+        if (idx < 0 || idx >= events.length) return;
+        currentIdx = idx;
+        slider.value = idx;
+        counter.textContent = (idx + 1) + ' / ' + events.length;
+        updateProgress();
+        var ev = events[idx];
+
+        tsEl.style.display = 'block';
+        tsEl.textContent = formatTime(ev.time);
+
+        placeholder.style.display = 'none';
+        summaryCard.style.display = 'none';
+        detailContent.style.display = 'flex';
+        detailContent.style.flexDirection = 'column';
+        detailContent.style.flex = '1';
+        detailContent.style.minHeight = '0';
+
+        document.getElementById('detail-time').textContent = formatTime(ev.time);
+        document.getElementById('detail-title').textContent = ev.title;
+
+        var statusBadge = ev.status === 'analyzed'
+            ? '<span class="article-status analyzed">Analyzed</span>'
+            : ev.status === 'failed'
+                ? '<span class="article-status failed">Failed</span>'
+                : '<span class="article-status pending">Pending</span>';
+        document.getElementById('detail-meta').innerHTML =
+            '<span class="badge badge-category">' + escHtml(ev.source) + '</span>' + statusBadge +
+            '<span style="font-size:11px;color:var(--text-muted);">' + ev.incidents.length + ' incident' + (ev.incidents.length !== 1 ? 's' : '') + '</span>';
+        document.getElementById('detail-summary').textContent = ev.summary;
+        document.getElementById('detail-link').href = ev.url;
+        document.getElementById('detail-article-link').href = '/articles/' + ev.id + '/';
+        var exLink = document.getElementById('detail-extraction-link');
+        if (ev.status === 'analyzed' && ev.incidents.length > 0) {
+            exLink.href = '/articles/' + ev.id + '/extraction-detail/';
+            exLink.style.display = 'inline-block';
+        } else { exLink.style.display = 'none'; }
+
+        computeRunningStats(idx);
+        updateStats();
+
+        // Build incident cards
+        var incHtml = '';
+        var currentEventMarkers = [];
+        for (var i = 0; i < ev.incidents.length; i++) {
+            var inc = ev.incidents[i];
+            incHtml += '<div class="tl-inc-card" data-inc-idx="' + i + '" data-lat="' + (inc.lat||'') + '" data-lng="' + (inc.lng||'') + '">' +
+                '<div class="tl-inc-head">' +
+                    '<span class="tl-inc-type">' + escHtml(inc.incident_type) + '</span>' +
+                    '<span class="badge badge-' + inc.severity + '">' + cap(inc.severity) + '</span>' +
+                    (inc.location_name ? '<span style="font-size:12px;color:var(--text-muted);">\uD83D\uDCCD ' + escHtml(inc.location_name) + '</span>' : '') +
+                '</div>' +
+                '<p class="tl-inc-desc">' + escHtml(inc.description) + '</p>' +
+                '<div class="tl-inc-details">' +
+                    '<span>Confidence: <strong>' + inc.confidence + '%</strong></span>' +
+                    '<span>' + escHtml(inc.region) + '</span>' +
+                    (inc.victim_count ? '<span style="color:#f97316;">Victims: ' + inc.victim_count + '</span>' : '') +
+                    (inc.fatality_count ? '<span style="color:var(--accent-danger);font-weight:600;">Deaths: ' + inc.fatality_count + '</span>' : '') +
+                    (inc.weapon ? '<span>Weapon: ' + escHtml(inc.weapon) + '</span>' : '') +
+                '</div>' +
+                '<a href="/incidents/' + inc.id + '/" class="tl-inc-link">View incident \u2192</a>' +
+            '</div>';
+
+            var m = addMarker(inc, idx, i, !skipAnim && i === 0);
+            if (m) currentEventMarkers.push({ marker: m, idx: i });
+        }
+        document.getElementById('tl-detail-incidents').innerHTML = incHtml;
+
+        // Click card -> open popup
+        document.querySelectorAll('#tl-detail-incidents .tl-inc-card').forEach(function(card) {
+            card.addEventListener('click', function(e) {
+                if (e.target.tagName === 'A') return;
+                document.querySelectorAll('#tl-detail-incidents .tl-inc-card').forEach(function(c) { c.classList.remove('tl-inc-active'); });
+                card.classList.add('tl-inc-active');
+                var ci = parseInt(card.dataset.incIdx);
+                for (var m = 0; m < currentEventMarkers.length; m++) {
+                    if (currentEventMarkers[m].idx === ci) { currentEventMarkers[m].marker.openPopup(); break; }
+                }
+            });
+        });
+
+        fadeMarkers(idx);
+        addLogEntry(ev, idx);
+        highlightLogEntry(idx);
+    }
+
+    function addLogEntry(ev, idx) {
+        if (document.getElementById('log-' + idx)) return;
+        logCount++;
+        document.getElementById('tl-log-count').textContent = logCount;
+        var incBadges = '';
+        for (var i = 0; i < ev.incidents.length; i++) {
+            incBadges += '<span class="tl-log-inc-sev" style="background:' + (severityColors[ev.incidents[i].severity] || '#6b7280') + ';"></span>' + escHtml(ev.incidents[i].incident_type);
+            if (i < ev.incidents.length - 1) incBadges += ', ';
+        }
+        var el = document.createElement('div');
+        el.className = 'tl-log-entry';
+        el.id = 'log-' + idx;
+        el.innerHTML =
+            '<span class="tl-log-time">' + shortDate(ev.time) + '<br>' + shortTime(ev.time) + '</span>' +
+            '<div class="tl-log-body">' +
+                '<div class="tl-log-article-title">' + escHtml(ev.title) + '</div>' +
+                '<div class="tl-log-inc">' + (ev.incidents.length > 0 ? incBadges : '<span style="opacity:0.5;">No incidents</span>') + '</div>' +
+            '</div>';
+        el.onclick = function() { showEvent(idx, true); };
+        logEntries.insertBefore(el, logEntries.firstChild);
+    }
+
+    function highlightLogEntry(idx) {
+        logEntries.querySelectorAll('.tl-log-entry').forEach(function(el) { el.classList.remove('active'); });
+        var a = document.getElementById('log-' + idx);
+        if (a) { a.classList.add('active'); a.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+    }
+
+    // --- End summary ---
+    function showEndSummary() {
+        detailContent.style.display = 'none';
+        summaryCard.style.display = 'block';
+
+        var grid = document.getElementById('tl-summary-grid');
+        grid.innerHTML =
+            kpi(runArticles, 'Articles') + kpi(runIncidents, 'Incidents') +
+            kpi(runVictims, 'Victims') + kpi(runDeaths, 'Deaths');
+
+        // Severity bars
+        var sevOrder = ['critical','high','medium','low'];
+        var sevHtml = '<h4>Severity breakdown</h4>';
+        var maxSev = 0;
+        sevOrder.forEach(function(s) { if ((sevTally[s]||0)>maxSev) maxSev = sevTally[s]; });
+        sevOrder.forEach(function(s) {
+            var c = sevTally[s] || 0;
+            sevHtml += '<div class="tl-summary-bar"><span class="tl-summary-bar-label">' + cap(s) + '</span>' +
+                '<div style="flex:1;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;"><div class="tl-summary-bar-fill" style="width:' + (maxSev ? c/maxSev*100 : 0) + '%;background:' + (severityColors[s]) + ';"></div></div>' +
+                '<span class="tl-summary-bar-count">' + c + '</span></div>';
+        });
+        document.getElementById('tl-summary-severity').innerHTML = sevHtml;
+
+        // Top categories
+        var cats = Object.entries(catTally).sort(function(a,b){return b[1]-a[1];}).slice(0,6);
+        var maxCat = cats.length ? cats[0][1] : 1;
+        var catHtml = '<h4>Top categories</h4>';
+        cats.forEach(function(c) {
+            catHtml += '<div class="tl-summary-bar"><span class="tl-summary-bar-label">' + escHtml(c[0]) + '</span>' +
+                '<div style="flex:1;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;"><div class="tl-summary-bar-fill" style="width:' + (c[1]/maxCat*100) + '%;background:var(--accent-primary);"></div></div>' +
+                '<span class="tl-summary-bar-count">' + c[1] + '</span></div>';
+        });
+        document.getElementById('tl-summary-categories').innerHTML = catHtml;
+
+        // Top locations
+        var locs = Object.entries(locTally).sort(function(a,b){return b[1]-a[1];}).slice(0,6);
+        var maxLoc = locs.length ? locs[0][1] : 1;
+        var locHtml = '<h4>Hotspot locations</h4>';
+        locs.forEach(function(l) {
+            locHtml += '<div class="tl-summary-bar"><span class="tl-summary-bar-label">\uD83D\uDCCD ' + escHtml(l[0]) + '</span>' +
+                '<div style="flex:1;background:rgba(255,255,255,0.05);border-radius:3px;overflow:hidden;"><div class="tl-summary-bar-fill" style="width:' + (l[1]/maxLoc*100) + '%;background:#f97316;"></div></div>' +
+                '<span class="tl-summary-bar-count">' + l[1] + '</span></div>';
+        });
+        document.getElementById('tl-summary-locations').innerHTML = locHtml;
+    }
+    function kpi(val, label) {
+        return '<div class="tl-summary-kpi"><div class="tl-summary-kpi-val">' + val + '</div><div class="tl-summary-kpi-label">' + label + '</div></div>';
+    }
+
+    // --- Playback ---
+    function togglePlay() { playing ? pause() : play(); }
+    function play() {
+        if (currentIdx >= events.length - 1) currentIdx = -1;
+        playing = true;
+        btnPlay.innerHTML = '&#9646;&#9646;';
+        step();
+    }
+    function pause() {
+        playing = false;
+        btnPlay.innerHTML = '&#9654;';
+        if (playTimer) { clearTimeout(playTimer); playTimer = null; }
+    }
+    function step() {
+        if (!playing) return;
+        var next = findNext(currentIdx);
+        if (next >= events.length) { pause(); showEndSummary(); return; }
+        showEvent(next);
+        playTimer = setTimeout(step, parseInt(speedSel.value) || 1000);
+    }
+    function findNext(fromIdx) {
+        var i = fromIdx + 1;
+        if (!skipEmpty) return i;
+        while (i < events.length && events[i].incidents.length === 0) i++;
+        return i;
+    }
+
+    function resetTimeline() {
+        pause();
+        currentIdx = -1;
+        slider.value = 0;
+        counter.textContent = '0 / ' + events.length;
+        pctEl.textContent = '0%';
+        progressEl.style.width = '0%';
+        tsEl.style.display = 'none';
+        placeholder.style.display = 'flex';
+        detailContent.style.display = 'none';
+        summaryCard.style.display = 'none';
+        logEntries.innerHTML = '';
+        logCount = 0;
+        document.getElementById('tl-log-count').textContent = '0';
+        allMarkers.forEach(function(m) { map.removeLayer(m.marker); });
+        allMarkers = [];
+        pulseTimers.forEach(function(t) { clearTimeout(t); });
+        pulseTimers = [];
+        runArticles = runIncidents = runVictims = runDeaths = 0;
+        sevTally = {}; catTally = {}; locTally = {};
+        updateStats();
+        map.setView([10.45, -61.25], 10);
+    }
+
+    // --- Controls ---
+    btnPlay.addEventListener('click', togglePlay);
+    btnReset.addEventListener('click', resetTimeline);
+    btnStepBack.addEventListener('click', function() { if (currentIdx > 0) showEvent(currentIdx - 1, true); });
+    btnStepFwd.addEventListener('click', function() {
+        var n = findNext(currentIdx);
+        if (n < events.length) showEvent(n);
+    });
+
+    slider.addEventListener('input', function() {
+        var target = parseInt(this.value);
+        if (target > currentIdx) {
+            for (var i = Math.max(0, currentIdx + 1); i < target; i++) {
+                var ev = events[i];
+                for (var j = 0; j < ev.incidents.length; j++) addMarker(ev.incidents[j], i, j, false);
+                addLogEntry(ev, i);
+            }
+        }
+        showEvent(target, target < currentIdx);
+    });
+
+    document.getElementById('chk-skip-empty').addEventListener('change', function() { skipEmpty = this.checked; });
+    document.getElementById('chk-fade').addEventListener('change', function() {
+        fadeOld = this.checked;
+        if (currentIdx >= 0) fadeMarkers(currentIdx);
+    });
+
+    // Map style toggle
+    document.getElementById('btn-map-style').addEventListener('click', function() {
+        map.removeLayer(mapStyles[mapStyleIdx]);
+        mapStyleIdx = (mapStyleIdx + 1) % mapStyles.length;
+        mapStyles[mapStyleIdx].addTo(map);
+        this.title = 'Map: ' + mapStyleNames[mapStyleIdx];
+    });
+
+    // Fullscreen
+    var mapWrap = document.getElementById('tl-map-wrap');
+    document.getElementById('btn-fullscreen').addEventListener('click', toggleFullscreen);
+    function toggleFullscreen() {
+        mapWrap.classList.toggle('tl-fullscreen');
+        setTimeout(function() { map.invalidateSize(); }, 100);
+    }
+
+    // Keyboard
+    document.addEventListener('keydown', function(e) {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+        if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+        if (e.code === 'ArrowRight') { e.preventDefault(); var n = findNext(currentIdx); if (n < events.length) showEvent(n); }
+        if (e.code === 'ArrowLeft') { e.preventDefault(); if (currentIdx > 0) showEvent(currentIdx - 1, true); }
+        if (e.code === 'KeyR') { e.preventDefault(); resetTimeline(); }
+        if (e.code === 'KeyF') { e.preventDefault(); toggleFullscreen(); }
+        if (e.code === 'Escape' && mapWrap.classList.contains('tl-fullscreen')) { e.preventDefault(); toggleFullscreen(); }
+    });
+
+    window.addEventListener('resize', function() { map.invalidateSize(); });
+    setTimeout(function() { map.invalidateSize(); }, 200);
+})();
+</script>
+{% endblock %}
+
+{% endblock %}

@@ -1,0 +1,461 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="animate-in">
+    {% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }}" style="margin-bottom:16px;padding:12px 16px;border-radius:8px;font-size:13px;
+        {% if message.tags == 'success' %}background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10b981;{% endif %}
+        {% if message.tags == 'error' %}background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;{% endif %}
+    ">{{ message }}</div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- Tab navigation -->
+    <div class="settings-tabs">
+        <input type="radio" name="settings-tab" id="tab-scraper" checked>
+        <input type="radio" name="settings-tab" id="tab-ollama">
+        <input type="radio" name="settings-tab" id="tab-geocoding">
+        <input type="radio" name="settings-tab" id="tab-danger">
+
+        <div class="settings-tab-nav">
+            <label for="tab-scraper" class="settings-tab-label">🕸️ Scraper</label>
+            <label for="tab-ollama" class="settings-tab-label">🤖 Ollama / AI</label>
+            <label for="tab-geocoding" class="settings-tab-label">📍 Geocoding</label>
+            <label for="tab-danger" class="settings-tab-label" style="color:var(--accent-danger);">⚠️ Danger Zone</label>
+        </div>
+
+        <!-- ═══════ TAB 1: Scraper ═══════ -->
+        <div class="settings-tab-content tab-scraper-content">
+            <div style="display:flex;flex-direction:column;gap:20px;">
+                <div class="card">
+                    <div class="card-header"><h3>Scraper Configuration</h3></div>
+                    <div class="card-body">
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="save_settings">
+
+                            <div style="display:flex; gap:20px;">
+                                <div class="filter-group" style="margin-bottom:16px; flex:1;">
+                                    <label>Scraper Timeout (seconds)</label>
+                                    <input type="number" name="scraper_timeout" class="filter-input" value="{{ scraper_timeout }}" min="1" max="60" required>
+                                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">How long to wait before dropping unresponsive articles.</div>
+                                </div>
+                                <div class="filter-group" style="margin-bottom:16px; flex:1;">
+                                    <label>Max Articles per Feed</label>
+                                    <input type="number" name="max_articles_per_feed" class="filter-input" value="{{ max_articles_per_feed }}" min="1" max="400000" required>
+                                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Limit how many articles to process per source during ingestion.</div>
+                                </div>
+                            </div>
+
+                            <h4 style="border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:8px;">📅 Historical Scraping</h4>
+
+                            <div style="display:flex; gap:20px;">
+                                <div class="filter-group" style="margin-bottom:16px; flex:1;">
+                                    <label>Historical Start Date</label>
+                                    <input type="date" name="historical_date_from" class="filter-input" value="{{ historical_date_from }}">
+                                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Fetch articles from this date onward during historical backfill (default: 2020-01-01).</div>
+                                </div>
+                                <div class="filter-group" style="margin-bottom:16px; flex:1;">
+                                    <label>Historical Max Pages</label>
+                                    <input type="number" name="historical_max_pages" class="filter-input" value="{{ historical_max_pages }}" min="0" max="500">
+                                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">0 = unlimited pagination (up to safety limit of 100 pages).</div>
+                                </div>
+                            </div>
+
+                            <div style="margin-top:24px;">
+                                <button type="submit" class="btn btn-primary">💾 Save Scraper Settings</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Source Progress (under Scraper Configuration) -->
+                <div class="card">
+                    <div class="card-header"><h3>📊 Source Progress</h3></div>
+                    <div class="card-body" style="padding:0;overflow-x:auto;max-height:500px;overflow-y:auto;">
+                        {% if source_stats %}
+                        <table class="data-table" style="width:100%;font-size:12px;">
+                            <thead>
+                                <tr>
+                                    <th>Source</th>
+                                    <th>Scraped</th>
+                                    <th>Oldest article</th>
+                                    <th>Newest article</th>
+                                    <th>Last Check</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in source_stats %}
+                                <tr>
+                                    <td><strong>{{ s.name }}</strong><br><span class="badge badge-category" style="font-size:9px;">{{ s.scraper_type|upper }}</span></td>
+                                    <td>{{ s.total_scraped }}</td>
+                                    <td>{% if s.oldest_date %}{{ s.oldest_date|date:"M d, Y" }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+                                    <td>{% if s.newest_date %}{{ s.newest_date|date:"M d, Y" }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+                                    <td>{% if s.last_checked %}{{ s.last_checked|timesince }} ago{% else %}<span style="color:var(--text-muted);">Never</span>{% endif %}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:13px;">No active sources.</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ TAB 2: Ollama / AI ═══════ -->
+        <div class="settings-tab-content tab-ollama-content">
+            <div class="map-layout" style="gap:20px;">
+                <div class="card" style="flex:2;">
+                    <div class="card-header"><h3>AI Extractor Settings (Ollama)</h3></div>
+                    <div class="card-body">
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="save_settings">
+
+                            <div class="filter-group" style="margin-bottom:16px;">
+                                <label>Ollama Host URL</label>
+                                <input type="text" id="ollama_host_input" name="ollama_host" class="filter-input" value="{{ ollama_host }}" style="width:100%;max-width:400px;" required placeholder="http://localhost:11434">
+                                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Must include protocol and port (e.g., http://localhost:11434). Then click "Fetch models" to load available models.</div>
+                            </div>
+
+                            <div class="filter-group" style="margin-bottom:16px;">
+                                <label>Ollama Model</label>
+                                <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+                                    <select name="ollama_model" id="ollama_model_select" class="filter-input" style="min-width:220px;max-width:400px;" required>
+                                        <option value="">Select a model (required)</option>
+                                        {% if ollama_model %}
+                                        <option value="{{ ollama_model }}" selected>{{ ollama_model }}</option>
+                                        {% endif %}
+                                    </select>
+                                    <button type="button" class="btn" onclick="fetchOllamaModels()" id="fetch_models_btn">📥 Fetch models</button>
+                                </div>
+                                <div id="ollama_model_danger" class="ollama-model-danger" style="display:{% if ollama_model %}none{% else %}block{% endif %};margin-top:8px;padding:10px 12px;border-radius:6px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.35);color:#ef4444;font-size:13px;">
+                                    ⚠️ Please select a model. We recommend <strong>qwen2.5:7b</strong> for best results with incident extraction.
+                                </div>
+                                <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Choose a model from the list after fetching. Recommended: <code>qwen2.5:7b</code>. Run <code>ollama pull qwen2.5:7b</code> if not installed.</div>
+                            </div>
+
+                            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:16px;margin-bottom:16px;">
+                                <div class="filter-group">
+                                    <label>Process Limit</label>
+                                    <input type="number" name="ai_extractor_limit" class="filter-input" value="{{ ai_extractor_limit }}" min="1" max="50000" required>
+                                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Max articles per run (default 15000)</div>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Content Max Chars</label>
+                                    <input type="number" name="ai_content_max_chars" class="filter-input" value="{{ ai_content_max_chars }}" min="500" max="30000">
+                                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Chars sent to AI (default 6000)</div>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Temperature</label>
+                                    <input type="number" name="ai_temperature" class="filter-input" value="{{ ai_temperature }}" min="0" max="2" step="0.1">
+                                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">0–2, lower = more deterministic</div>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Num Predict</label>
+                                    <input type="number" name="ai_num_predict" class="filter-input" value="{{ ai_num_predict }}" min="256" max="8192">
+                                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Max tokens to generate</div>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Timeout (sec)</label>
+                                    <input type="number" name="ai_timeout" class="filter-input" value="{{ ai_timeout }}" min="30" max="600">
+                                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Request timeout</div>
+                                </div>
+                            </div>
+
+                            <div class="filter-group" style="margin-bottom:24px;">
+                                <label>Extraction Prompt</label>
+                                <textarea name="ai_extraction_prompt" class="filter-input" rows="18" style="width:100%;font-family:var(--font-mono);font-size:12px;resize:vertical;min-height:320px;">{{ ai_extraction_prompt }}</textarea>
+                                <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">Required placeholders: <code>{article_text}</code> and <code>{publish_date}</code>. Leave empty to use built-in default.</div>
+                            </div>
+
+                            <div style="margin-top:24px;display:flex;gap:12px;">
+                                <button type="submit" class="btn btn-primary">💾 Save AI Settings</button>
+                                <button type="button" class="btn" onclick="testOllama()">🔌 Test AI Connection</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Connection Status sidebar -->
+                <div class="card" style="flex:1;height:max-content;">
+                    <div class="card-header"><h3>Connection Status</h3></div>
+                    <div class="card-body">
+                        <div id="test-result-box" style="padding:16px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);font-size:13px;">
+                            Click "Test AI Connection" to verify your Ollama Host and Model are correctly configured.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ TAB 3: Geocoding ═══════ -->
+        <div class="settings-tab-content tab-geocoding-content">
+            <div class="card" style="max-width:700px;">
+                <div class="card-header"><h3>Geocoding (Location Accuracy)</h3></div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="save_settings">
+
+                        <div class="filter-group" style="margin-bottom:16px;">
+                            <label>Google Maps API Key <span style="font-size:10px;color:var(--text-muted);font-weight:normal;">(optional — best accuracy)</span></label>
+                            <input type="password" name="google_maps_api_key" class="filter-input" value="{{ google_maps_api_key }}" style="width:100%;max-width:400px;" autocomplete="off">
+                            <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">
+                                10,000 requests/month free. Get a key at
+                                <a href="https://console.cloud.google.com/apis/credentials" target="_blank" style="color:var(--accent-primary);">Google Cloud Console</a>
+                                &rarr; Enable "Geocoding API". When set, gives precise street-level coordinates.
+                                Without it, the system uses geocode.xyz + Nominatim (neighborhood-level accuracy).
+                            </div>
+                        </div>
+
+                        <div style="margin-top:24px;">
+                            <button type="submit" class="btn btn-primary">💾 Save Geocoding Settings</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ TAB 4: Danger Zone ═══════ -->
+        <div class="settings-tab-content tab-danger-content">
+            <div class="card" style="max-width:700px;border:1px solid rgba(239,68,68,0.3);">
+                <div class="card-header" style="background:rgba(239,68,68,0.08);"><h3 style="color:#ef4444;">⚠️ Danger Zone</h3></div>
+                <div class="card-body">
+                    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;">
+                        These actions are <strong style="color:#ef4444;">destructive and irreversible</strong>. They will permanently delete data from the database.
+                    </p>
+
+                    <div style="padding:16px;border:1px solid rgba(239,68,68,0.2);border-radius:8px;background:rgba(239,68,68,0.04);">
+                        <h4 style="margin-top:0;color:#ef4444;">Clear All Data</h4>
+                        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px;">
+                            Deletes <strong>all articles</strong> ({{ total_articles }}), <strong>all incidents</strong> ({{ total_incidents }}), and <strong>all scrape jobs</strong> ({{ total_scrape_jobs }}).
+                            Resets all source tracking counters and dates. News sources themselves are preserved.
+                        </p>
+                        <form method="post" id="clear-all-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="clear_all_data">
+                            <button type="button" class="btn" onclick="confirmClearAll()" style="background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.4);color:#ef4444;font-weight:600;">
+                                🗑️ Clear All Articles, Incidents &amp; Jobs
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Scrape Jobs -->
+            {% if recent_scrape_jobs %}
+            <div class="card" style="margin-top:20px;">
+                <div class="card-header"><h3>📋 Recent Scrape Jobs</h3></div>
+                <div class="card-body" style="padding:0;overflow-x:auto;">
+                    <table class="data-table" style="width:100%;font-size:12px;">
+                        <thead>
+                            <tr>
+                                <th>Source</th>
+                                <th>Status</th>
+                                <th>Date Range</th>
+                                <th>Found</th>
+                                <th>New</th>
+                                <th>Skipped</th>
+                                <th>Errors</th>
+                                <th>Started</th>
+                                <th>Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for job in recent_scrape_jobs %}
+                            <tr>
+                                <td><strong>{{ job.source.name }}</strong></td>
+                                <td>
+                                    {% if job.status == 'completed' %}
+                                    <span class="badge" style="background:rgba(16,185,129,0.15);color:#10b981;font-size:10px;">✓ Completed</span>
+                                    {% elif job.status == 'running' %}
+                                    <span class="badge" style="background:rgba(59,130,246,0.15);color:#3b82f6;font-size:10px;">⟳ Running</span>
+                                    {% else %}
+                                    <span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;font-size:10px;">✗ Failed</span>
+                                    {% endif %}
+                                </td>
+                                <td style="font-size:11px;">
+                                    {% if job.date_from and job.date_to %}{{ job.date_from|date:"Y-m-d" }} → {{ job.date_to|date:"Y-m-d" }}{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}
+                                </td>
+                                <td>{{ job.articles_found }}</td>
+                                <td style="color:var(--accent-success);">{{ job.articles_new }}</td>
+                                <td>{{ job.articles_skipped }}</td>
+                                <td>{% if job.errors %}<span style="color:var(--accent-danger);">{{ job.errors }}</span>{% else %}0{% endif %}</td>
+                                <td style="font-size:11px;">{{ job.started_at|date:"M d, H:i" }}</td>
+                                <td style="font-size:11px;">{% if job.elapsed %}{{ job.elapsed|floatformat:1 }}s{% else %}<span style="color:var(--text-muted);">—</span>{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<style>
+.settings-tabs {
+    position: relative;
+}
+.settings-tabs > input[type="radio"] {
+    display: none;
+}
+.settings-tab-nav {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-default);
+    padding-bottom: 0;
+}
+.settings-tab-label {
+    padding: 10px 18px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-muted);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    user-select: none;
+}
+.settings-tab-label:hover {
+    color: var(--text-primary);
+    background: rgba(255,255,255,0.03);
+}
+.settings-tab-content {
+    display: none;
+}
+
+/* Tab activation via radio state */
+#tab-scraper:checked ~ .settings-tab-nav label[for="tab-scraper"],
+#tab-ollama:checked ~ .settings-tab-nav label[for="tab-ollama"],
+#tab-geocoding:checked ~ .settings-tab-nav label[for="tab-geocoding"],
+#tab-danger:checked ~ .settings-tab-nav label[for="tab-danger"] {
+    color: var(--accent-primary);
+    border-bottom-color: var(--accent-primary);
+}
+#tab-scraper:checked ~ .tab-scraper-content,
+#tab-ollama:checked ~ .tab-ollama-content,
+#tab-geocoding:checked ~ .tab-geocoding-content,
+#tab-danger:checked ~ .tab-danger-content {
+    display: block;
+}
+</style>
+{% endblock %}
+
+{% block inline_scripts %}
+<script>
+function escapeHtml(text) {
+    if (text == null) return '';
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function fetchOllamaModels() {
+    var hostInput = document.getElementById('ollama_host_input');
+    var select = document.getElementById('ollama_model_select');
+    var btn = document.getElementById('fetch_models_btn');
+    var host = (hostInput && hostInput.value || '').trim().replace(/\/+$/, '');
+    if (!host) {
+        alert('Please enter an Ollama Host URL first.');
+        return;
+    }
+    var currentVal = select.value;
+    btn.disabled = true;
+    btn.textContent = '⏳ Fetching...';
+    fetch('/api/settings/ollama-models/?host=' + encodeURIComponent(host))
+        .then(function(r) {
+            return r.json().then(function(data) {
+                if (!r.ok) throw { error: data.error || 'Request failed' };
+                return data;
+            });
+        })
+        .then(function(data) {
+            if (data.models && data.models.length) {
+                select.innerHTML = '<option value="">Select a model (required)</option>';
+                data.models.forEach(function(name) {
+                    var opt = document.createElement('option');
+                    opt.value = name;
+                    opt.textContent = name;
+                    if (name === 'qwen2.5:7b' || name === 'qwen2.5:7b:latest') opt.textContent += ' (recommended)';
+                    select.appendChild(opt);
+                });
+                if (currentVal && data.models.indexOf(currentVal) !== -1) select.value = currentVal;
+                else if (data.models.indexOf('qwen2.5:7b') !== -1) select.value = 'qwen2.5:7b';
+                else if (data.models.indexOf('qwen2.5:7b:latest') !== -1) select.value = 'qwen2.5:7b:latest';
+                updateOllamaModelDanger();
+            } else {
+                select.innerHTML = '<option value="">Select a model (required)</option>';
+                alert('No models found on this host. Run e.g. ollama pull qwen2.5:7b');
+            }
+        })
+        .catch(function(err) {
+            var msg = (err && err.error) ? err.error : ((err && err.message) ? err.message : 'Failed to fetch models');
+            alert('Could not fetch models: ' + msg);
+        })
+        .finally(function() {
+            btn.disabled = false;
+            btn.textContent = '📥 Fetch models';
+        });
+}
+
+function updateOllamaModelDanger() {
+    var select = document.getElementById('ollama_model_select');
+    var danger = document.getElementById('ollama_model_danger');
+    if (danger) danger.style.display = (select && !select.value) ? 'block' : 'none';
+}
+
+function testOllama() {
+    var box = document.getElementById('test-result-box');
+    var host = document.querySelector('input[name="ollama_host"]').value;
+    var model = document.getElementById('ollama_model_select').value;
+    if (!model) {
+        box.innerHTML = '❌ <strong>Select a model first</strong><br><br><span style="color:var(--accent-danger)">Choose a model from the dropdown (we recommend qwen2.5:7b) and click "Fetch models" if the list is empty.</span>';
+        box.style.border = '1px solid rgba(239, 68, 68, 0.5)';
+        box.style.background = 'rgba(239, 68, 68, 0.05)';
+        return;
+    }
+
+    box.innerHTML = '🔄 Testing connection to <strong>' + escapeHtml(host) + '</strong>...';
+    box.style.border = '1px solid rgba(59, 130, 246, 0.5)';
+
+    fetch('/api/settings/test-ai/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ host: host, model: model })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.status === 'ok') {
+            box.innerHTML = '✅ <strong>Connection Successful!</strong><br><br>Model <code>' + escapeHtml(model) + '</code> is installed and responding correctly.';
+            box.style.border = '1px solid rgba(16, 185, 129, 0.5)';
+            box.style.background = 'rgba(16, 185, 129, 0.05)';
+        } else {
+            box.innerHTML = '❌ <strong>Connection Failed</strong><br><br><span style="color:var(--accent-danger)">' + escapeHtml(data.message) + '</span>';
+            box.style.border = '1px solid rgba(239, 68, 68, 0.5)';
+            box.style.background = 'rgba(239, 68, 68, 0.05)';
+        }
+    })
+    .catch(function() {
+        box.innerHTML = '❌ <strong>Network Error</strong><br><br><span style="color:var(--accent-danger)">Could not reach the local server to test.</span>';
+        box.style.border = '1px solid rgba(239, 68, 68, 0.5)';
+    });
+}
+
+function confirmClearAll() {
+    if (confirm('⚠️ This will permanently delete ALL articles, incidents, and scrape jobs.\n\nAre you sure? This cannot be undone.')) {
+        document.getElementById('clear-all-form').submit();
+    }
+}
+
+(function() {
+    var sel = document.getElementById('ollama_model_select');
+    if (sel) sel.addEventListener('change', updateOllamaModelDanger);
+})();
+</script>
+{% endblock %}

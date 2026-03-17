@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Incident Detail - Trinidad Intelligence Map</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13c8ec",
+                        "background-light": "#f6f8f8",
+                        "background-dark": "#101f22",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 min-h-screen font-display">
+<div class="relative flex h-auto min-h-screen w-full flex-col overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<!-- Top Navigation Bar -->
+<header class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 px-6 py-3 bg-background-light dark:bg-background-dark sticky top-0 z-50">
+<div class="flex items-center gap-4">
+<div class="text-primary">
+<span class="material-symbols-outlined text-3xl">radar</span>
+</div>
+<h2 class="text-lg font-bold leading-tight tracking-tight">Trinidad Incident Intelligence</h2>
+</div>
+<div class="flex flex-1 justify-end gap-6 items-center">
+<label class="hidden md:flex flex-col min-w-40 h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-lg overflow-hidden">
+<div class="text-slate-400 flex border-none bg-slate-100 dark:bg-slate-800 items-center justify-center pl-4">
+<span class="material-symbols-outlined text-xl">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 border-none bg-slate-100 dark:bg-slate-800 focus:ring-0 h-full placeholder:text-slate-500 px-4 text-base" placeholder="Search incidents..." value=""/>
+</div>
+</label>
+<button class="flex min-w-[120px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-primary text-background-dark text-sm font-bold tracking-wide hover:opacity-90 transition-opacity">
+<span class="material-symbols-outlined mr-2 text-sm">map</span>
+<span class="truncate">Back to Map</span>
+</button>
+<div class="bg-slate-200 dark:bg-slate-800 rounded-full size-10 flex items-center justify-center">
+<span class="material-symbols-outlined text-slate-500">person</span>
+</div>
+</div>
+</header>
+<main class="max-w-[1400px] mx-auto w-full px-6 py-6">
+<!-- Breadcrumbs -->
+<nav class="flex items-center gap-2 mb-6 text-sm">
+<a class="text-slate-500 hover:text-primary" href="#">Home</a>
+<span class="material-symbols-outlined text-xs text-slate-500">chevron_right</span>
+<a class="text-slate-500 hover:text-primary" href="#">Intelligence Map</a>
+<span class="material-symbols-outlined text-xs text-slate-500">chevron_right</span>
+<span class="text-primary font-medium">Shooting at Ariapita Avenue</span>
+</nav>
+<!-- Page Header -->
+<div class="flex flex-wrap justify-between items-end gap-4 mb-8">
+<div class="flex flex-col gap-2">
+<div class="flex items-center gap-3">
+<span class="px-2 py-1 bg-red-500/20 text-red-500 text-xs font-bold rounded uppercase tracking-wider">Critical</span>
+<span class="text-slate-500 text-sm font-medium">Incident ID: #TRI-9942</span>
+</div>
+<h1 class="text-3xl md:text-4xl font-black tracking-tight">Shooting at Ariapita Avenue</h1>
+<p class="text-slate-500 flex items-center gap-2">
+<span class="material-symbols-outlined text-sm">calendar_today</span>
+                            Reported: Oct 24, 2023 • 22:15 AST
+                        </p>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center justify-center rounded-lg h-11 px-6 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined mr-2">download</span>
+                            Download Report
+                        </button>
+<button class="flex items-center justify-center rounded-lg h-11 px-4 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 text-sm font-bold border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined">share</span>
+</button>
+</div>
+</div>
+<!-- Main Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+<!-- Left Column: Details & Article -->
+<div class="lg:col-span-2 space-y-8">
+<!-- AI Extracted Quick Stats -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+<div class="bg-slate-100 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-800">
+<p class="text-slate-500 text-xs font-bold uppercase mb-1">Type</p>
+<p class="text-xl font-bold">Gun Violence</p>
+</div>
+<div class="bg-slate-100 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-800">
+<p class="text-slate-500 text-xs font-bold uppercase mb-1">Location</p>
+<p class="text-xl font-bold">Woodbrook</p>
+</div>
+<div class="bg-slate-100 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-800">
+<p class="text-slate-500 text-xs font-bold uppercase mb-1">Involved</p>
+<p class="text-xl font-bold text-primary">3 Parties</p>
+</div>
+<div class="bg-slate-100 dark:bg-slate-800/50 p-5 rounded-xl border border-slate-200 dark:border-slate-800">
+<p class="text-slate-500 text-xs font-bold uppercase mb-1">Status</p>
+<p class="text-xl font-bold text-amber-500">Active</p>
+</div>
+</div>
+<!-- Detailed AI Insights -->
+<section class="bg-slate-100 dark:bg-slate-800/30 rounded-xl p-6 border border-slate-200 dark:border-slate-800">
+<h3 class="text-xl font-bold mb-6 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">psychology</span>
+                                AI-Extracted Intelligence
+                            </h3>
+<div class="space-y-6">
+<div class="grid md:grid-cols-2 gap-6">
+<div>
+<h4 class="text-slate-500 text-sm font-bold uppercase mb-3">Key Parties Identified</h4>
+<ul class="space-y-2">
+<li class="flex items-center gap-2">
+<span class="size-2 rounded-full bg-primary"></span>
+<span class="text-sm font-medium">Suspect: Unidentified Male, 20s</span>
+</li>
+<li class="flex items-center gap-2">
+<span class="size-2 rounded-full bg-primary"></span>
+<span class="text-sm font-medium">Victim: Business Owner, Ariapita Ave</span>
+</li>
+<li class="flex items-center gap-2">
+<span class="size-2 rounded-full bg-primary"></span>
+<span class="text-sm font-medium">Witness: Security Guard (Regency)</span>
+</li>
+</ul>
+</div>
+<div>
+<h4 class="text-slate-500 text-sm font-bold uppercase mb-3">Threat Assessment</h4>
+<p class="text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
+                                            The incident occurred in a high-traffic nightlife zone. Intelligence suggests a targeted altercation rather than a random act of violence. High risk of localized business disruption for next 24-48 hours.
+                                        </p>
+</div>
+</div>
+</div>
+</section>
+<!-- Original Content Section -->
+<section>
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-xl font-bold">Original Report</h3>
+<a class="text-primary text-sm font-bold flex items-center gap-1 hover:underline" href="#">
+                                    Source Link <span class="material-symbols-outlined text-xs">open_in_new</span>
+</a>
+</div>
+<div class="prose prose-slate dark:prose-invert max-w-none bg-slate-100 dark:bg-slate-800/30 rounded-xl p-8 border border-slate-200 dark:border-slate-800">
+<p class="leading-relaxed text-slate-700 dark:text-slate-300">
+                                    PORT OF SPAIN — Police are currently on the scene of a shooting incident that occurred late Tuesday night on the busy Ariapita Avenue strip in Woodbrook. Preliminary reports indicate that shortly after 10:00 PM, several loud explosions were heard in the vicinity of a popular bar.
+                                </p>
+<p class="mt-4 leading-relaxed text-slate-700 dark:text-slate-300">
+                                    Eyewitnesses claim a dispute broke out between two individuals before one party produced a firearm. One person has been rushed to the Port of Spain General Hospital with gunshot wounds. Officers from the Woodbrook Police Station have cordoned off a section of the avenue, causing significant traffic delays for patrons in the area.
+                                </p>
+<p class="mt-4 leading-relaxed text-slate-700 dark:text-slate-300">
+                                    "It was chaos, people were running for cover," said one patron who was dining nearby. "The police arrived within minutes but the shooter had already fled in a waiting vehicle heading west." Investigations are continuing. No arrests have been made at this time.
+                                </p>
+</div>
+</section>
+</div>
+<!-- Right Column: Map & Related -->
+<div class="space-y-8">
+<!-- Mini Map -->
+<div class="bg-slate-100 dark:bg-slate-800/50 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+<div class="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+<h3 class="font-bold flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-xl">location_on</span>
+                                    Precise Location
+                                </h3>
+<button class="text-xs font-bold text-primary">Expand</button>
+</div>
+<div class="h-64 w-full bg-slate-300 dark:bg-slate-700 relative">
+<div class="absolute inset-0 bg-cover bg-center opacity-80" data-alt="Satellite map of Ariapita Avenue Woodbrook" data-location="Port of Spain" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuB4MHVsssK9zd0gXmG5iUntYZ5VkyfO42Q2UjPVFgXmxFSwNmxp0H-XXKHYGnq3cUfTDKewmOLOPcFq6O94Hxc97Wbr8DqBdYfthitLV4K88CWPBkSj8mOFcJzLH5FzbQxXxUMRXdgdr3n46rHtEBznZEtfznCHvqWHEXso5v-UpAc05SeBQQl6tjxou7Hgvzq37lAJVPhOaA4KhXP-Vfwez6aIw01k2dYab8uNWPhGF6iND0RAi-W2Du4gmM-PrTTbWVXb5_cUVUZt')"></div>
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="relative">
+<span class="material-symbols-outlined text-red-500 text-5xl drop-shadow-lg">location_on</span>
+<div class="absolute -top-1 -right-1 size-3 bg-red-500 rounded-full animate-ping"></div>
+</div>
+</div>
+</div>
+<div class="p-4 text-sm text-slate-500">
+<p>Ariapita Avenue &amp; French Street Intersection</p>
+<p class="mt-1 font-mono text-xs">10.6657° N, 61.5234° W</p>
+</div>
+</div>
+<!-- Related Incidents -->
+<section>
+<h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary">dynamic_feed</span>
+                                Related Events
+                            </h3>
+<div class="space-y-4">
+<!-- Related Item 1 -->
+<div class="group flex items-start gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all cursor-pointer">
+<div class="size-12 rounded bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined">warning</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h4 class="font-bold text-sm group-hover:text-primary transition-colors">Armed Robbery</h4>
+<span class="text-[10px] text-slate-500 font-bold uppercase">2 Days Ago</span>
+</div>
+<p class="text-xs text-slate-500 line-clamp-1">Tragarete Road, 0.4 miles away</p>
+</div>
+</div>
+<!-- Related Item 2 -->
+<div class="group flex items-start gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all cursor-pointer">
+<div class="size-12 rounded bg-primary/10 text-primary flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined">security</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h4 class="font-bold text-sm group-hover:text-primary transition-colors">Police Patrol Increase</h4>
+<span class="text-[10px] text-slate-500 font-bold uppercase">Active</span>
+</div>
+<p class="text-xs text-slate-500 line-clamp-1">Western Main Rd Intelligence Update</p>
+</div>
+</div>
+<!-- Related Item 3 -->
+<div class="group flex items-start gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800/80 transition-all cursor-pointer">
+<div class="size-12 rounded bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined">emergency</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between items-start mb-1">
+<h4 class="font-bold text-sm group-hover:text-primary transition-colors">Stabbing Incident</h4>
+<span class="text-[10px] text-slate-500 font-bold uppercase">Oct 12</span>
+</div>
+<p class="text-xs text-slate-500 line-clamp-1">St. James area, Similar weapon type</p>
+</div>
+</div>
+</div>
+<button class="w-full mt-4 py-3 rounded-lg border border-dashed border-slate-300 dark:border-slate-700 text-slate-500 text-sm font-bold hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                View Intelligence Clusters
+                            </button>
+</section>
+<!-- Activity Timeline -->
+<div class="bg-primary/5 rounded-xl p-6 border border-primary/20">
+<h3 class="text-sm font-bold uppercase text-primary mb-4 tracking-wider">Update Timeline</h3>
+<div class="space-y-4 relative before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-primary/20">
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 size-[24px] rounded-full bg-primary flex items-center justify-center text-background-dark">
+<span class="material-symbols-outlined text-xs">check</span>
+</div>
+<p class="text-xs font-bold text-slate-400">10:45 PM</p>
+<p class="text-sm font-medium">Site cordoned by POS Division</p>
+</div>
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 size-[24px] rounded-full bg-slate-700 flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-xs">local_police</span>
+</div>
+<p class="text-xs font-bold text-slate-400">10:28 PM</p>
+<p class="text-sm font-medium">First responders arrived</p>
+</div>
+<div class="relative pl-8">
+<div class="absolute left-0 top-1 size-[24px] rounded-full bg-slate-700 flex items-center justify-center text-white">
+<span class="material-symbols-outlined text-xs">radio</span>
+</div>
+<p class="text-xs font-bold text-slate-400">10:15 PM</p>
+<p class="text-sm font-medium">Initial report via Emergency Services</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+<!-- Footer -->
+<footer class="mt-auto border-t border-slate-200 dark:border-slate-800 px-6 py-8 text-center">
+<p class="text-slate-500 text-sm">© 2023 Trinidad Incident Intelligence Map. Authorized Personnel Only.</p>
+</footer>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Incident List View - Trinidad Incident Intelligence Map</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13c8ec",
+                        "background-light": "#f6f8f8",
+                        "background-dark": "#101f22",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        .material-symbols-outlined { font-size: 20px; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display min-h-screen">
+<div class="flex h-screen flex-col overflow-hidden">
+<!-- Top Navigation -->
+<header class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 bg-background-light dark:bg-background-dark px-6 py-3 shrink-0">
+<div class="flex items-center gap-4">
+<div class="text-primary">
+<span class="material-symbols-outlined text-3xl">shield_with_heart</span>
+</div>
+<h2 class="text-lg font-bold tracking-tight">Trinidad Incident Intelligence</h2>
+</div>
+<nav class="flex flex-1 justify-center gap-8">
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Dashboard</a>
+<a class="text-sm font-medium hover:text-primary transition-colors border-b-2 border-primary" href="#">Map View</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Incidents</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Reports</a>
+</nav>
+<div class="flex items-center gap-3">
+<button class="flex items-center justify-center rounded p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="flex items-center justify-center rounded p-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700">
+<span class="material-symbols-outlined">settings</span>
+</button>
+<div class="bg-primary/20 rounded-full w-8 h-8 flex items-center justify-center ml-2 border border-primary/30">
+<span class="text-xs font-bold text-primary">JD</span>
+</div>
+</div>
+</header>
+<!-- Main Content Area -->
+<div class="flex flex-1 overflow-hidden">
+<!-- Sidebar: Advanced Filtering -->
+<aside class="w-72 border-r border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-background-dark/50 overflow-y-auto p-6 shrink-0">
+<div class="flex items-center justify-between mb-6">
+<h3 class="text-sm font-bold uppercase tracking-widest text-slate-500">Advanced Filters</h3>
+<button class="text-xs text-primary font-semibold hover:underline">Clear All</button>
+</div>
+<!-- Date Range -->
+<div class="mb-8">
+<label class="block text-sm font-semibold mb-3">Date Range</label>
+<div class="space-y-2">
+<div class="relative">
+<input class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm px-3 py-2 focus:ring-1 focus:ring-primary" type="date" value="2023-10-01"/>
+</div>
+<div class="relative">
+<input class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm px-3 py-2 focus:ring-1 focus:ring-primary" type="date" value="2023-10-31"/>
+</div>
+</div>
+</div>
+<!-- Severity -->
+<div class="mb-8">
+<label class="block text-sm font-semibold mb-3">Severity</label>
+<div class="space-y-2">
+<label class="flex items-center gap-3 cursor-pointer group">
+<input checked="" class="rounded border-slate-300 dark:border-slate-700 text-primary focus:ring-primary bg-transparent" type="checkbox"/>
+<span class="text-sm group-hover:text-primary transition-colors">Critical</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input checked="" class="rounded border-slate-300 dark:border-slate-700 text-primary focus:ring-primary bg-transparent" type="checkbox"/>
+<span class="text-sm group-hover:text-primary transition-colors">High</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="rounded border-slate-300 dark:border-slate-700 text-primary focus:ring-primary bg-transparent" type="checkbox"/>
+<span class="text-sm group-hover:text-primary transition-colors">Medium</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="rounded border-slate-300 dark:border-slate-700 text-primary focus:ring-primary bg-transparent" type="checkbox"/>
+<span class="text-sm group-hover:text-primary transition-colors">Low</span>
+</label>
+</div>
+</div>
+<!-- Incident Category -->
+<div class="mb-8">
+<label class="block text-sm font-semibold mb-3">Incident Category</label>
+<div class="space-y-2">
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="rounded border-slate-300 dark:border-slate-700 text-primary focus:ring-primary bg-transparent" type="checkbox"/>
+<span class="text-sm group-hover:text-primary transition-colors">Natural Disaster</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input checked="" class="rounded border-slate-300 dark:border-slate-700 text-primary focus:ring-primary bg-transparent" type="checkbox"/>
+<span class="text-sm group-hover:text-primary transition-colors">Public Health</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="rounded border-slate-300 dark:border-slate-700 text-primary focus:ring-primary bg-transparent" type="checkbox"/>
+<span class="text-sm group-hover:text-primary transition-colors">Civil Unrest</span>
+</label>
+<label class="flex items-center gap-3 cursor-pointer group">
+<input class="rounded border-slate-300 dark:border-slate-700 text-primary focus:ring-primary bg-transparent" type="checkbox"/>
+<span class="text-sm group-hover:text-primary transition-colors">Infrastructure</span>
+</label>
+</div>
+</div>
+<!-- Region -->
+<div class="mb-8">
+<label class="block text-sm font-semibold mb-3">Region</label>
+<select class="w-full bg-slate-100 dark:bg-slate-800 border-none rounded-lg text-sm px-3 py-2 focus:ring-1 focus:ring-primary">
+<option>All Regions</option>
+<option>Port of Spain</option>
+<option>San Fernando</option>
+<option>Arima</option>
+<option>Chaguanas</option>
+<option>Point Fortin</option>
+</select>
+</div>
+<button class="w-full bg-primary hover:bg-primary/90 text-background-dark font-bold py-2.5 rounded transition-all flex items-center justify-center gap-2 mt-4">
+<span class="material-symbols-outlined">filter_list</span>
+                    Apply Filters
+                </button>
+</aside>
+<!-- Table Content Section -->
+<main class="flex-1 flex flex-col min-w-0">
+<!-- Search & Actions Bar -->
+<div class="p-6 pb-2">
+<div class="flex items-center justify-between mb-6">
+<div>
+<h1 class="text-2xl font-bold">Incident List View</h1>
+<p class="text-slate-500 text-sm">Real-time intelligence feed for Trinidad &amp; Tobago</p>
+</div>
+<div class="flex gap-2">
+<button class="bg-primary/10 text-primary border border-primary/20 px-4 py-2 rounded-lg font-semibold text-sm hover:bg-primary/20 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">download</span>
+                                Export CSV
+                            </button>
+<button class="bg-primary text-background-dark px-4 py-2 rounded-lg font-semibold text-sm hover:bg-primary/90 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add</span>
+                                New Incident
+                            </button>
+</div>
+</div>
+<div class="flex items-center gap-4 bg-slate-100 dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800">
+<div class="flex-1 relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">search</span>
+<input class="w-full bg-transparent border-none pl-10 pr-4 py-2 text-sm focus:ring-0 placeholder:text-slate-500" placeholder="Search by incident ID, type, or location..." type="text"/>
+</div>
+<div class="h-6 w-px bg-slate-300 dark:bg-slate-700"></div>
+<div class="flex gap-1">
+<button class="p-2 text-slate-500 hover:text-primary transition-colors"><span class="material-symbols-outlined">grid_view</span></button>
+<button class="p-2 text-primary bg-primary/10 rounded"><span class="material-symbols-outlined">list</span></button>
+</div>
+</div>
+</div>
+<!-- Data Table -->
+<div class="flex-1 overflow-auto px-6 py-4">
+<table class="w-full text-left border-collapse min-w-[1000px]">
+<thead>
+<tr class="border-b border-slate-200 dark:border-slate-800 text-slate-500 text-xs font-bold uppercase tracking-wider">
+<th class="px-4 py-4 w-12"></th>
+<th class="px-4 py-4">Severity</th>
+<th class="px-4 py-4">Incident Type</th>
+<th class="px-4 py-4">Location</th>
+<th class="px-4 py-4">Region</th>
+<th class="px-4 py-4">Date / Time</th>
+<th class="px-4 py-4">Source</th>
+<th class="px-4 py-4">Status</th>
+<th class="px-4 py-4 text-right">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+<!-- Row 1 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
+<td class="px-4 py-4"><input class="rounded border-slate-300 dark:border-slate-700 bg-transparent text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="px-4 py-4">
+<span class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span>
+<span class="text-sm font-semibold">Critical</span>
+</span>
+</td>
+<td class="px-4 py-4 text-sm font-medium">Flood Emergency</td>
+<td class="px-4 py-4 text-sm">Western Main Road</td>
+<td class="px-4 py-4 text-sm">Port of Spain</td>
+<td class="px-4 py-4 text-sm">Oct 24, 14:30 AST</td>
+<td class="px-4 py-4">
+<span class="text-xs bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded">OSINT</span>
+</td>
+<td class="px-4 py-4">
+<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20">Active</span>
+</td>
+<td class="px-4 py-4 text-right">
+<button class="text-primary hover:bg-primary hover:text-background-dark font-bold text-xs px-3 py-1.5 rounded transition-all">VIEW</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
+<td class="px-4 py-4"><input class="rounded border-slate-300 dark:border-slate-700 bg-transparent text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="px-4 py-4">
+<span class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.5)]"></span>
+<span class="text-sm font-semibold">High</span>
+</span>
+</td>
+<td class="px-4 py-4 text-sm font-medium">Power Outage</td>
+<td class="px-4 py-4 text-sm">High Street</td>
+<td class="px-4 py-4 text-sm">San Fernando</td>
+<td class="px-4 py-4 text-sm">Oct 24, 12:15 AST</td>
+<td class="px-4 py-4">
+<span class="text-xs bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded">Public</span>
+</td>
+<td class="px-4 py-4">
+<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-yellow-500/10 text-yellow-500 border border-yellow-500/20">Pending</span>
+</td>
+<td class="px-4 py-4 text-right">
+<button class="text-primary hover:bg-primary hover:text-background-dark font-bold text-xs px-3 py-1.5 rounded transition-all">VIEW</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
+<td class="px-4 py-4"><input class="rounded border-slate-300 dark:border-slate-700 bg-transparent text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="px-4 py-4">
+<span class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-primary shadow-[0_0_8px_rgba(19,200,236,0.5)]"></span>
+<span class="text-sm font-semibold">Medium</span>
+</span>
+</td>
+<td class="px-4 py-4 text-sm font-medium">Protest Action</td>
+<td class="px-4 py-4 text-sm">Queen's Park Sav.</td>
+<td class="px-4 py-4 text-sm">Port of Spain</td>
+<td class="px-4 py-4 text-sm">Oct 24, 09:00 AST</td>
+<td class="px-4 py-4">
+<span class="text-xs bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded">Police</span>
+</td>
+<td class="px-4 py-4">
+<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Resolved</span>
+</td>
+<td class="px-4 py-4 text-right">
+<button class="text-primary hover:bg-primary hover:text-background-dark font-bold text-xs px-3 py-1.5 rounded transition-all">VIEW</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
+<td class="px-4 py-4"><input class="rounded border-slate-300 dark:border-slate-700 bg-transparent text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="px-4 py-4">
+<span class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]"></span>
+<span class="text-sm font-semibold">Critical</span>
+</span>
+</td>
+<td class="px-4 py-4 text-sm font-medium">Dengue Outbreak</td>
+<td class="px-4 py-4 text-sm">Central District</td>
+<td class="px-4 py-4 text-sm">Chaguanas</td>
+<td class="px-4 py-4 text-sm">Oct 23, 18:45 AST</td>
+<td class="px-4 py-4">
+<span class="text-xs bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded">Health Min.</span>
+</td>
+<td class="px-4 py-4">
+<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-500 border border-blue-500/20">Active</span>
+</td>
+<td class="px-4 py-4 text-right">
+<button class="text-primary hover:bg-primary hover:text-background-dark font-bold text-xs px-3 py-1.5 rounded transition-all">VIEW</button>
+</td>
+</tr>
+<!-- Row 5 -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors group">
+<td class="px-4 py-4"><input class="rounded border-slate-300 dark:border-slate-700 bg-transparent text-primary focus:ring-primary" type="checkbox"/></td>
+<td class="px-4 py-4">
+<span class="flex items-center gap-2">
+<span class="w-2.5 h-2.5 rounded-full bg-slate-400"></span>
+<span class="text-sm font-semibold">Low</span>
+</span>
+</td>
+<td class="px-4 py-4 text-sm font-medium">Road Repair</td>
+<td class="px-4 py-4 text-sm">Uriah Butler Hwy</td>
+<td class="px-4 py-4 text-sm">Caroni</td>
+<td class="px-4 py-4 text-sm">Oct 23, 10:20 AST</td>
+<td class="px-4 py-4">
+<span class="text-xs bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded">MOWT</span>
+</td>
+<td class="px-4 py-4">
+<span class="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-500/10 text-slate-500 border border-slate-500/20">Archived</span>
+</td>
+<td class="px-4 py-4 text-right">
+<button class="text-primary hover:bg-primary hover:text-background-dark font-bold text-xs px-3 py-1.5 rounded transition-all">VIEW</button>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Pagination Footer -->
+<footer class="p-6 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0">
+<p class="text-sm text-slate-500">Showing <span class="font-bold text-slate-900 dark:text-slate-100">1 to 5</span> of 124 incidents</p>
+<div class="flex gap-2">
+<button class="p-2 border border-slate-200 dark:border-slate-800 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50" disabled="">
+<span class="material-symbols-outlined">chevron_left</span>
+</button>
+<button class="w-10 h-10 flex items-center justify-center rounded bg-primary text-background-dark font-bold">1</button>
+<button class="w-10 h-10 flex items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">2</button>
+<button class="w-10 h-10 flex items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">3</button>
+<div class="flex items-end px-1 pb-2">...</div>
+<button class="w-10 h-10 flex items-center justify-center rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">25</button>
+<button class="p-2 border border-slate-200 dark:border-slate-800 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+<span class="material-symbols-outlined">chevron_right</span>
+</button>
+</div>
+</footer>
+</main>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,756 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="animate-in">
+
+    <!-- ═══ Pipeline Status KPIs ═══ -->
+    <div class="kpi-grid">
+        <div class="kpi-card info">
+            <div class="kpi-icon">📰</div>
+            <div class="kpi-content">
+                <div class="kpi-label">Total Articles</div>
+                <div class="kpi-value" id="kpi-articles">{{ articles_total }}</div>
+            </div>
+        </div>
+        <div class="kpi-card warning">
+            <div class="kpi-icon">🔄</div>
+            <div class="kpi-content">
+                <div class="kpi-label">Unprocessed</div>
+                <div class="kpi-value" id="kpi-unprocessed">{{ articles_unprocessed }}</div>
+            </div>
+        </div>
+        <div class="kpi-card success">
+            <div class="kpi-icon">📍</div>
+            <div class="kpi-content">
+                <div class="kpi-label">Total Incidents</div>
+                <div class="kpi-value" id="kpi-incidents">{{ incidents_total }}</div>
+            </div>
+        </div>
+        <div class="kpi-card danger">
+            <div class="kpi-icon">⏳</div>
+            <div class="kpi-content">
+                <div class="kpi-label">Pending Review</div>
+                <div class="kpi-value" id="kpi-pending">{{ incidents_pending }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══ Main Ops Grid ═══ -->
+    <div class="ops-grid">
+        <!-- Left Column: Controls + Sources + Batch -->
+        <div>
+            <!-- Pipeline Actions -->
+            <div class="card" style="margin-bottom:16px;">
+                <div class="card-header">
+                    <h3>🚀 Pipeline Controls</h3>
+                    <div id="pipeline-indicator" class="pipeline-status idle">
+                        <span class="pipeline-dot"></span>
+                        <span id="pipeline-status-text">Idle</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;">
+                        Trigger data pipeline from the dashboard. Scraping fetches articles from all sources. Extraction sends them to Ollama AI to identify incidents.
+                    </p>
+
+                    <div class="ops-actions">
+                        <button class="btn btn-primary" id="btn-scrape" onclick="triggerAction('scrape')">
+                            <span class="btn-spinner" id="spin-scrape"></span>
+                            📡 Scrape News
+                        </button>
+                        <button class="btn" id="btn-extract" onclick="triggerAction('extract')" style="background:rgba(139,92,246,0.15);border-color:rgba(139,92,246,0.3);color:#8b5cf6;">
+                            <span class="btn-spinner" id="spin-extract"></span>
+                            🤖 AI Extract
+                        </button>
+                        <button class="btn btn-success" id="btn-full" onclick="triggerAction('full')">
+                            <span class="btn-spinner" id="spin-full"></span>
+                            ⚡ Full Pipeline
+                        </button>
+                        <button class="btn" id="btn-regeocode_all" onclick="triggerAction('regeocode_all')" style="background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.3);color:#16a34a;">
+                            📍 Re-geocode All Incidents
+                        </button>
+                    </div>
+
+                    <!-- Last Run Info -->
+                    <div class="last-run-info" id="last-run-info">
+                        <div class="run-item" id="run-scrape" style="display:none;">
+                            <span class="run-label">Last Scrape:</span>
+                            <span class="run-value" id="run-scrape-time">—</span>
+                            <span class="run-count" id="run-scrape-count"></span>
+                            <span class="run-elapsed" id="run-scrape-elapsed"></span>
+                        </div>
+                        <div class="run-item" id="run-extract" style="display:none;">
+                            <span class="run-label">Last Extract:</span>
+                            <span class="run-value" id="run-extract-time">—</span>
+                            <span class="run-count" id="run-extract-count"></span>
+                            <span class="run-elapsed" id="run-extract-elapsed"></span>
+                        </div>
+                    </div>
+
+                    <!-- Error display -->
+                    <div id="pipeline-error" class="pipeline-error" style="display:none;"></div>
+
+                    <!-- Database Stats -->
+                    <div class="last-run-info" style="margin-top:12px;">
+                        <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;">Database Stats</div>
+                        <div class="run-item">
+                            <span class="run-label">Articles:</span>
+                            <span id="stat-total" class="run-value">—</span>
+                            <span style="color:var(--text-muted);font-size:10px;">(<span id="stat-processed">0</span> processed, <span id="stat-unprocessed2">0</span> pending)</span>
+                        </div>
+                        <div class="run-item">
+                            <span class="run-label">Incidents:</span>
+                            <span id="stat-incidents" class="run-value">—</span>
+                            <span style="color:var(--text-muted);font-size:10px;">(<span id="stat-approved">0</span> approved, <span id="stat-ipending">0</span> pending, <span id="stat-rejected">0</span> rejected)</span>
+                        </div>
+                        <div class="run-item">
+                            <span class="run-label">Sources:</span>
+                            <span id="stat-sources" class="run-value">—</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Source Management -->
+            <div class="card" style="margin-bottom:16px;">
+                <div class="card-header">
+                    <h3>📡 News Sources</h3>
+                    <button class="btn btn-sm btn-primary" onclick="showAddSource()">+ Add Source</button>
+                </div>
+                <div class="card-body" style="padding:0;">
+                    <!-- Add source form (hidden) -->
+                    <div id="add-source-form" class="add-source-form" style="display:none;">
+                        <div class="source-form-grid">
+                            <div class="filter-group">
+                                <label>Name</label>
+                                <input type="text" id="new-source-name" class="filter-input" placeholder="e.g. Guardian TT">
+                            </div>
+                            <div class="filter-group">
+                                <label>URL</label>
+                                <input type="text" id="new-source-url" class="filter-input" placeholder="https://example.com">
+                            </div>
+                            <div class="filter-group">
+                                <label>RSS URL</label>
+                                <input type="text" id="new-source-rss" class="filter-input" placeholder="https://example.com/feed/ (optional)">
+                            </div>
+                            <div class="filter-group">
+                                <label>Type</label>
+                                <select id="new-source-type" class="filter-select" onchange="toggleApiFields()">
+                                    <option value="rss">RSS Feed</option>
+                                    <option value="web">Web Scraper</option>
+                                    <option value="api">JSON API</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- JSON API specific fields -->
+                        <div id="api-config-fields" style="display:none; margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--border-color);">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h4 style="margin: 0; font-size: 13px; color: var(--text-primary);">API Configuration</h4>
+                                <button class="btn btn-sm" id="btn-fetch-sample" style="background-color: var(--primary-bg); color: var(--primary-text);" onclick="fetchSample()">📥 Fetch Sample Data</button>
+                            </div>
+                            <div class="source-form-grid">
+                                <div class="filter-group" style="grid-column: span 2;">
+                                    <label>API Headers (JSON format)</label>
+                                    <textarea id="new-source-headers" class="filter-input" placeholder='{"User-Agent": "Mozilla/5.0..."}' style="height: 60px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+                                </div>
+                            </div>
+                            <!-- Visual Field Mapper -->
+                            <div id="visual-mapper-container" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; margin-top: 16px;">
+                                <h5 style="margin: 0 0 12px 0; font-size: 12px; color: var(--text-secondary);">Visual Field Mapping</h5>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                                    <div class="filter-group" style="grid-column: span 2;">
+                                        <label>Items Array Path</label>
+                                        <input type="text" id="map-target-path" class="filter-input" placeholder="e.g. data.rows">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Title Field <span style="color:red">*</span></label>
+                                        <select id="map-title" class="filter-select api-key-select"><option value="">-- Fetch sample first --</option></select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>URL Field <span style="color:red">*</span></label>
+                                        <select id="map-url" class="filter-select api-key-select"><option value="">-- Fetch sample first --</option></select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Publish Date Field</label>
+                                        <select id="map-date" class="filter-select api-key-select"><option value="">-- Select field --</option></select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Author Field</label>
+                                        <select id="map-author" class="filter-select api-key-select"><option value="">-- Select field --</option></select>
+                                    </div>
+                                    <div class="filter-group" style="grid-column: span 2;">
+                                        <label>Content/Summary Field</label>
+                                        <select id="map-content" class="filter-select api-key-select"><option value="">-- Select field --</option></select>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- API Pagination -->
+                            <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 6px; border: 1px solid var(--border-color);">
+                                <h5 style="margin: 0 0 10px 0; font-size: 12px; color: var(--text-secondary);">Pagination</h5>
+                                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                                    <input type="checkbox" id="api-pagination-enabled" style="width: auto;">
+                                    <label for="api-pagination-enabled" style="margin: 0;">Enable pagination</label>
+                                </div>
+                                <div class="source-form-grid" id="api-pagination-fields">
+                                    <div class="filter-group">
+                                        <label>Type</label>
+                                        <select id="api-pagination-type" class="filter-select">
+                                            <option value="offset">Offset</option>
+                                            <option value="page">Page number</option>
+                                            <option value="cursor">Cursor / Next URL</option>
+                                        </select>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Param name</label>
+                                        <input type="text" id="api-pagination-param" class="filter-input" placeholder="e.g. o" value="o">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Page size</label>
+                                        <input type="number" id="api-pagination-page-size" class="filter-input" placeholder="100" value="100" min="1">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Max pages (0 = unlimited)</label>
+                                        <input type="number" id="api-pagination-max-pages" class="filter-input" placeholder="5" value="1" min="0">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Start offset (0 = first page)</label>
+                                        <input type="number" id="api-pagination-initial-offset" class="filter-input" placeholder="0" value="0" min="0">
+                                        <small style="color: var(--text-muted); font-size: 10px;">Offset type: start from this index. Page type: use Start page below.</small>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Start page (page type only)</label>
+                                        <input type="number" id="api-pagination-initial-page" class="filter-input" placeholder="1" value="1" min="1">
+                                    </div>
+                                    <div class="filter-group" id="api-pagination-next-wrap">
+                                        <label>Next URL field (cursor)</label>
+                                        <input type="text" id="api-pagination-next-field" class="filter-input" placeholder="e.g. next" value="next">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- API Date Range -->
+                            <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 6px; border: 1px solid var(--border-color);">
+                                <h5 style="margin: 0 0 10px 0; font-size: 12px; color: var(--text-secondary);">📅 Date Range (optional)</h5>
+                                <p style="font-size: 11px; color: var(--text-muted); margin: 0 0 10px 0;">Param names the API uses (e.g. d1, d2). Optionally set default start/end dates for the first run (otherwise 2020–today).</p>
+                                <div class="source-form-grid">
+                                    <div class="filter-group">
+                                        <label>Start date param name</label>
+                                        <input type="text" id="api-date-range-start" class="filter-input" placeholder="e.g. d1">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>End date param name</label>
+                                        <input type="text" id="api-date-range-end" class="filter-input" placeholder="e.g. d2">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Date format</label>
+                                        <input type="text" id="api-date-range-format" class="filter-input" placeholder="%Y-%m-%d" value="%Y-%m-%d">
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Default start date (optional)</label>
+                                        <input type="date" id="api-date-range-default-start" class="filter-input">
+                                        <small style="color: var(--text-muted); font-size: 10px;">Used when no previous scrape; else leave blank for 2020-01-01.</small>
+                                    </div>
+                                    <div class="filter-group">
+                                        <label>Default end date (optional)</label>
+                                        <input type="date" id="api-date-range-default-end" class="filter-input">
+                                        <small style="color: var(--text-muted); font-size: 10px;">Leave blank for &quot;today&quot;.</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Advanced Settings Section -->
+                        <div style="margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--border-color);">
+                            <h4 style="margin: 0 0 12px 0; font-size: 13px; color: var(--text-primary);">Advanced Settings</h4>
+                            <div class="source-form-grid">
+                                <div class="filter-group">
+                                    <label>Max Articles Per Scrape (Optional)</label>
+                                    <input type="number" id="new-source-limit" class="filter-input" placeholder="e.g. 50">
+                                    <small style="color: var(--text-muted); font-size: 11px;">Leave blank to use global defaults.</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                            <!-- Hidden input to store PK when editing -->
+                            <input type="hidden" id="edit-source-id" value="">
+                            
+                            <div style="display:flex;gap:8px;padding:16px 16px 16px 0;">
+                                <button class="btn btn-primary btn-sm" id="btn-save-source" onclick="saveSource()">Save Source</button>
+                                <button class="btn btn-sm" onclick="hideAddSource()">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sources table -->
+                    <div class="data-table-container">
+                        <table class="data-table" id="sources-table">
+                            <thead>
+                                <tr>
+                                    <th>Source</th>
+                                    <th>Type</th>
+                                    <th>Articles</th>
+                                    <th>Last Checked</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sources-tbody">
+                                {% for src in sources %}
+                                <tr id="source-row-{{ src.pk }}">
+                                    <td>
+                                        <div style="font-weight:600;color:var(--text-primary);">{{ src.name }}</div>
+                                        <div style="font-size:10px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;">{{ src.url }}</div>
+                                    </td>
+                                    <td><span class="badge badge-category">{{ src.get_scraper_type_display }}</span></td>
+                                    <td style="font-family:var(--font-mono);">{{ src.articles.count }}</td>
+                                    <td style="font-size:11px;color:var(--text-muted);">
+                                        {% if src.last_checked %}{{ src.last_checked|timesince }} ago{% else %}Never{% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge {% if src.is_active %}badge-approved{% else %}badge-rejected{% endif %}">
+                                            {% if src.is_active %}Active{% else %}Disabled{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <a href="{% url 'edit_source_view' src.pk %}" class="btn btn-sm" style="text-decoration: none;">
+                                                ✏️ Edit
+                                            </a>
+                                            <button class="btn btn-sm {% if src.is_active %}btn-danger{% else %}btn-success{% endif %}" onclick="toggleSource({{ src.pk }})">
+                                                {% if src.is_active %}⏹️ Pause{% else %}▶️ Resume{% endif %}
+                                            </button>
+                                            <button class="btn btn-sm btn-danger" onclick="deleteSource({{ src.pk }}, '{{ src.name|escapejs }}')">🗑️</button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6">
+                                        <div class="empty-state"><p>No sources configured.</p></div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Log -->
+            <div class="card" style="margin-bottom:16px;">
+                <div class="card-header" style="flex-shrink:0;">
+                    <h3>📜 Activity Log</h3>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:10px;color:var(--text-muted);" id="log-count">0 entries</span>
+                        <div class="auto-refresh-badge">
+                            <span class="auto-refresh-dot"></span>
+                            Live
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body" id="activity-log" style="overflow-y:auto;max-height:calc(100vh - 200px);flex:1;padding:0;">
+                    <div class="log-empty" id="log-empty">
+                        <div style="text-align:center;padding:40px;color:var(--text-muted);">
+                            <div style="font-size:32px;margin-bottom:12px;opacity:0.3;">📜</div>
+                            <p>No activity yet.</p>
+                            <p style="font-size:11px;">Click a pipeline button to see real-time logs.</p>
+                        </div>
+                    </div>
+                    <div id="log-entries"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block inline_scripts %}
+<script>
+// ═══ Pipeline polling ═══
+let pollInterval = null;
+let isPolling = false;
+
+function triggerAction(action) {
+    const urls = {
+        'scrape': '/api/pipeline/scrape/',
+        'extract': '/api/pipeline/extract/',
+        'full': '/api/pipeline/full/',
+        'regeocode_all': '/api/incidents/regeocode-all/',
+    };
+
+    const btn = document.getElementById('btn-' + action);
+    if (btn) btn.disabled = true;
+
+    fetch(urls[action], { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.status === 'busy') {
+                showToast(data.message, 'warning');
+                if (btn) btn.disabled = false;
+            } else {
+                showToast(data.message, 'success');
+                startPolling(1000); // Fast poll during active pipeline
+            }
+        })
+        .catch(err => {
+            showToast('Request failed: ' + err, 'error');
+            if (btn) btn.disabled = false;
+        });
+}
+
+function startPolling(interval) {
+    if (pollInterval) clearInterval(pollInterval);
+    isPolling = true;
+    pollPipelineStatus();
+    pollInterval = setInterval(pollPipelineStatus, interval || 2000);
+}
+
+function pollPipelineStatus() {
+    fetch('/api/pipeline/status/')
+        .then(r => r.json())
+        .then(data => {
+            // Update indicator
+            const indicator = document.getElementById('pipeline-indicator');
+            const statusText = document.getElementById('pipeline-status-text');
+
+            if (data.scraping || data.extracting) {
+                indicator.className = 'pipeline-status running';
+                let status = [];
+                if (data.scraping) status.push('Scraping');
+                if (data.extracting) status.push('Extracting');
+                statusText.textContent = status.join(' + ') + '...';
+
+                // Disable buttons during run
+                ['btn-scrape', 'btn-extract', 'btn-full', 'btn-regeocode_all'].forEach(id => {
+                    const b = document.getElementById(id);
+                    if (b) b.disabled = true;
+                });
+            } else {
+                indicator.className = 'pipeline-status idle';
+                statusText.textContent = 'Idle';
+                ['btn-scrape', 'btn-extract', 'btn-full', 'btn-regeocode_all'].forEach(id => {
+                    const b = document.getElementById(id);
+                    if (b) b.disabled = false;
+                });
+                // Slow down polling when idle
+                if (isPolling && pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = setInterval(pollPipelineStatus, 5000);
+                }
+            }
+
+            // Update KPIs
+            updateText('kpi-articles', data.articles_total);
+            updateText('kpi-unprocessed', data.articles_unprocessed);
+            updateText('kpi-incidents', data.incidents_total);
+            updateText('kpi-pending', data.incidents_pending);
+
+            // Database stats
+            updateText('stat-total', data.articles_total);
+            updateText('stat-processed', data.articles_processed || 0);
+            updateText('stat-unprocessed2', data.articles_unprocessed);
+            updateText('stat-incidents', data.incidents_total);
+            updateText('stat-approved', data.incidents_approved);
+            updateText('stat-ipending', data.incidents_pending);
+            updateText('stat-rejected', data.incidents_rejected || 0);
+            updateText('stat-sources', `${data.sources_active}/${data.sources_total || data.sources_active} active`);
+
+            // Last run info
+            if (data.last_scrape) {
+                document.getElementById('run-scrape').style.display = 'flex';
+                document.getElementById('run-scrape-time').textContent = data.last_scrape;
+                document.getElementById('run-scrape-count').textContent = data.last_scrape_count + ' articles';
+                if (data.last_scrape_elapsed) {
+                    document.getElementById('run-scrape-elapsed').textContent = '(' + data.last_scrape_elapsed + ')';
+                }
+            }
+            if (data.last_extract) {
+                document.getElementById('run-extract').style.display = 'flex';
+                document.getElementById('run-extract-time').textContent = data.last_extract;
+                document.getElementById('run-extract-count').textContent = data.last_extract_count + ' incidents';
+                if (data.last_extract_elapsed) {
+                    document.getElementById('run-extract-elapsed').textContent = '(' + data.last_extract_elapsed + ')';
+                }
+            }
+
+            // Errors
+            const errEl = document.getElementById('pipeline-error');
+            if (data.scrape_error || data.extract_error) {
+                errEl.style.display = 'block';
+                errEl.innerHTML = '';
+                if (data.scrape_error) errEl.innerHTML += '<div><strong>Scrape:</strong> ' + escapeHtml(data.scrape_error) + '</div>';
+                if (data.extract_error) errEl.innerHTML += '<div><strong>Extract:</strong> ' + escapeHtml(data.extract_error) + '</div>';
+            } else {
+                errEl.style.display = 'none';
+            }
+
+            // Activity log
+            if (data.log && data.log.length > 0) {
+                document.getElementById('log-empty').style.display = 'none';
+                document.getElementById('log-count').textContent = data.log.length + ' entries';
+
+                const entries = document.getElementById('log-entries');
+                const newHtml = data.log.map(l => {
+                    const msg = escapeHtml(l.message);
+                    // Style separator lines differently
+                    const isSeparator = msg.startsWith('━') || msg.includes('━━━');
+                    const cssClass = isSeparator ? 'log-entry log-separator' : `log-entry log-${l.level}`;
+                    return `<div class="${cssClass}">
+                        <span class="log-time">${l.time}</span>
+                        <span class="log-msg">${msg}</span>
+                    </div>`;
+                }).join('');
+
+                // Only update if changed (prevents flicker)
+                if (entries.innerHTML !== newHtml) {
+                    entries.innerHTML = newHtml;
+                }
+            }
+        })
+        .catch(() => {});
+}
+
+function updateText(id, val) {
+    const el = document.getElementById(id);
+    if (el && el.textContent != val) el.textContent = val;
+}
+
+// ═══ Source Management ═══
+function toggleApiFields() {
+    const type = document.getElementById('new-source-type').value;
+    const apiFields = document.getElementById('api-config-fields');
+    if (type === 'api') {
+        apiFields.style.display = 'block';
+    } else {
+        apiFields.style.display = 'none';
+    }
+}
+
+function showAddSource() {
+    // We only use this for adding new sources now
+    document.getElementById('edit-source-id').value = '';
+    document.getElementById('new-source-name').value = '';
+    document.getElementById('new-source-url').value = '';
+    document.getElementById('new-source-rss').value = '';
+    document.getElementById('new-source-type').value = 'rss';
+    document.getElementById('new-source-headers').value = '';
+    document.getElementById('map-target-path').value = '';
+    document.querySelectorAll('.api-key-select').forEach(s => s.innerHTML = '<option value="">-- Fetch sample first --</option>');
+    document.getElementById('new-source-limit').value = '';
+    document.getElementById('api-pagination-enabled').checked = false;
+    document.getElementById('api-pagination-type').value = 'offset';
+    document.getElementById('api-pagination-param').value = 'o';
+    document.getElementById('api-pagination-page-size').value = '100';
+    document.getElementById('api-pagination-max-pages').value = '1';
+    document.getElementById('api-pagination-initial-offset').value = '0';
+    document.getElementById('api-pagination-initial-page').value = '1';
+    document.getElementById('api-pagination-next-field').value = 'next';
+    document.getElementById('api-date-range-start').value = '';
+    document.getElementById('api-date-range-end').value = '';
+    document.getElementById('api-date-range-format').value = '%Y-%m-%d';
+    document.getElementById('api-date-range-default-start').value = '';
+    document.getElementById('api-date-range-default-end').value = '';
+    document.getElementById('btn-save-source').textContent = 'Add Source';
+    
+    toggleApiFields();
+    document.getElementById('add-source-form').style.display = 'block';
+}
+
+function processJsonInput(str) {
+    if (!str || str === 'None' || str === 'null') return '';
+    try {
+        // Handle Python's single-quoted dict string representation from template escapejs
+        let validJsonStr = str.replace(/'/g, '"');
+        validJsonStr = validJsonStr.replace(/True/g, 'true').replace(/False/g, 'false').replace(/None/g, 'null');
+        return JSON.stringify(JSON.parse(validJsonStr), null, 2);
+    } catch(e) {
+        return str; // Return as-is if parsing fails
+    }
+}
+
+function hideAddSource() {
+    document.getElementById('add-source-form').style.display = 'none';
+}
+
+function saveSource() {
+    const editId = document.getElementById('edit-source-id').value;
+    const urlEndpoint = editId ? `/api/sources/${editId}/edit/` : '/api/sources/add/';
+    const successMsg = editId ? 'Source updated successfully!' : 'Source added successfully!';
+
+    const data = {
+        name: document.getElementById('new-source-name').value,
+        url: document.getElementById('new-source-url').value,
+        rss_url: document.getElementById('new-source-rss').value,
+        scraper_type: document.getElementById('new-source-type').value,
+        max_articles_per_scrape: document.getElementById('new-source-limit').value || null
+    };
+    
+    if (data.scraper_type === 'api') {
+        const headersRaw = document.getElementById('new-source-headers').value;
+        const mappingData = {
+            items_path: document.getElementById('map-target-path').value,
+            title_field: document.getElementById('map-title').value,
+            url_field: document.getElementById('map-url').value,
+            date_field: document.getElementById('map-date').value,
+            author_field: document.getElementById('map-author').value,
+            content_field: document.getElementById('map-content').value
+        };
+        
+        try {
+            data.api_headers = headersRaw ? JSON.parse(headersRaw) : null;
+            data.api_mapping = mappingData;
+            
+            const paginationEnabled = document.getElementById('api-pagination-enabled').checked;
+            data.api_pagination = paginationEnabled ? {
+                enabled: true,
+                type: document.getElementById('api-pagination-type').value,
+                param: document.getElementById('api-pagination-param').value || 'o',
+                page_size: parseInt(document.getElementById('api-pagination-page-size').value, 10) || 100,
+                max_pages: parseInt(document.getElementById('api-pagination-max-pages').value, 10),
+                initial_offset: parseInt(document.getElementById('api-pagination-initial-offset').value, 10) || 0,
+                initial_page: parseInt(document.getElementById('api-pagination-initial-page').value, 10) || 1,
+                next_field: document.getElementById('api-pagination-next-field').value || 'next'
+            } : null;
+
+            var drStart = document.getElementById('api-date-range-start').value.trim();
+            var drEnd = document.getElementById('api-date-range-end').value.trim();
+            if (drStart && drEnd) {
+                var drDefaultStart = document.getElementById('api-date-range-default-start').value.trim();
+                var drDefaultEnd = document.getElementById('api-date-range-default-end').value.trim();
+                data.api_date_range = {
+                    start_param: drStart,
+                    end_param: drEnd,
+                    format: document.getElementById('api-date-range-format').value.trim() || '%Y-%m-%d'
+                };
+                if (drDefaultStart) data.api_date_range.default_start = drDefaultStart;
+                if (drDefaultEnd) data.api_date_range.default_end = drDefaultEnd;
+            } else {
+                data.api_date_range = null;
+            }
+        } catch(e) {
+            showToast('Invalid JSON in API configuration fields', 'error');
+            return;
+        }
+    }
+    
+    if (!data.name || !data.url) {
+        showToast('Name and URL are required', 'error');
+        return;
+    }
+    fetch(urlEndpoint, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    })
+    .then(r => r.json())
+    .then(result => {
+        if (result.status === 'created' || result.status === 'ok') {
+            showToast(successMsg, 'success');
+            setTimeout(() => location.reload(), 800);
+        } else if (result.status === 'exists') {
+            showToast('Source already exists', 'warning');
+        } else {
+            showToast('Failed to save source', 'error');
+        }
+    })
+    .catch(err => showToast('Failed: ' + err, 'error'));
+}
+
+function fetchSample() {
+    const btn = document.getElementById('btn-fetch-sample');
+    
+    const data = {
+        url: document.getElementById('new-source-url').value,
+        rss_url: document.getElementById('new-source-rss').value,
+        scraper_type: document.getElementById('new-source-type').value,
+    };
+    
+    if (!data.url && !data.rss_url) return showToast('URL is required', 'error');
+    
+    const headersRaw = document.getElementById('new-source-headers').value;
+    try { data.api_headers = headersRaw ? JSON.parse(headersRaw) : null; } catch(e) {}
+    
+    btn.disabled = true;
+    btn.textContent = 'Fetching...';
+    
+    fetch('/api/sources/fetch-sample/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    })
+    .then(r => r.json())
+    .then(res => {
+        btn.disabled = false;
+        btn.textContent = '📥 Fetch Sample Data';
+        
+        if (res.success) {
+            document.getElementById('map-target-path').value = res.items_path;
+            
+            let optionsHtml = '<option value="">-- Leave empty to ignore --</option>';
+            res.keys.forEach(k => {
+                const sampleStr = res.sample_item[k] ? ` (Sample: "${res.sample_item[k]}")` : '';
+                optionsHtml += `<option value="${k}">${k}${sampleStr}</option>`;
+            });
+            
+            document.querySelectorAll('.api-key-select').forEach(sel => sel.innerHTML = optionsHtml);
+            showToast('Sample fetched successfully! Map your fields.', 'success');
+        } else {
+            showToast('Error: ' + res.error, 'error');
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.textContent = '📥 Fetch Sample Data';
+        showToast('Network error fetching sample', 'error');
+    });
+}
+
+function toggleSource(id) {
+    fetch(`/api/sources/${id}/toggle/`, { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            showToast(`${data.name} ${data.is_active ? 'enabled' : 'disabled'}`, 'success');
+            setTimeout(() => location.reload(), 600);
+        })
+        .catch(err => showToast('Failed: ' + err, 'error'));
+}
+
+function deleteSource(id, name) {
+    if (!confirm(`Delete source "${name}"? This cannot be undone.`)) return;
+    fetch(`/api/sources/${id}/delete/`, { method: 'POST' })
+        .then(r => r.json())
+        .then(() => {
+            showToast(`Source "${name}" deleted`, 'success');
+            const row = document.getElementById('source-row-' + id);
+            if (row) row.remove();
+        })
+        .catch(err => showToast('Failed: ' + err, 'error'));
+}
+
+// ═══ Toast Notification ═══
+function showToast(message, type) {
+    const toast = document.createElement('div');
+    toast.className = 'toast toast-' + type;
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.classList.add('show'), 10);
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+    return text.replace(/[&<>"']/g, m => map[m]);
+}
+
+// Start polling on load
+document.addEventListener('DOMContentLoaded', function() {
+    startPolling(3000);
+});
+</script>
+{% endblock %}

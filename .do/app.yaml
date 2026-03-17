@@ -1,0 +1,34 @@
+# DigitalOcean App Platform spec for TT_OSINT (demo: SQLite, no PostgreSQL).
+# 1. Push this repo to GitHub, then in DO: Create App → GitHub → select repo.
+# 2. Or deploy with doctl: doctl apps create --spec .do/app.yaml
+# 3. Set DJANGO_SECRET_KEY and ALLOWED_HOSTS in the App Platform UI (Settings → Environment Variables).
+# 4. Replace github.repo below with your owner/repo if using doctl or API.
+#
+# Note: SQLite is used (no DATABASE_URL). Data is stored in the app's filesystem and
+# may be reset on redeploy/restart. For persistent data, add a PostgreSQL database.
+
+name: tt-osint
+region: nyc
+
+features:
+  - buildpack-stack=ubuntu-22
+
+services:
+  - name: web
+    environment_slug: python
+    github:
+      repo: YOUR_GITHUB_OWNER/TT_OSINT
+      branch: main
+      deploy_on_push: true
+    build_command: python manage.py collectstatic --noinput
+    run_command: python manage.py migrate --noinput && gunicorn tt_osint.wsgi:application --bind 0.0.0.0:$PORT --worker-tmp-dir /dev/shm --workers 2
+    http_port: 8080
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    envs:
+      - key: DJANGO_DEBUG
+        value: "false"
+        scope: RUN_TIME
+        type: GENERAL
+      # Set in App Platform UI: DJANGO_SECRET_KEY, ALLOWED_HOSTS (e.g. your-app-xxxxx.ondigitalocean.app)
+      # Optional: OLLAMA_HOST, OLLAMA_MODEL if you run Ollama elsewhere

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width: 900px; margin: 0 auto; padding: 20px;">
+    <div style="margin-bottom: 16px; font-size: 13px; color: var(--text-muted);">
+        <a href="{% url 'story_list' %}" style="color: var(--text-muted);">Stories</a> ›
+        <span style="color: var(--accent);">{{ story.title|truncatewords:12 }}</span>
+    </div>
+
+    <div class="card" style="margin-bottom: 24px; padding: 24px;">
+        <h1 style="margin: 0 0 12px 0; font-size: 22px; line-height: 1.35; color: var(--text-primary);">{{ story.title }}</h1>
+        {% if story.summary %}
+        <p style="margin: 0; font-size: 15px; color: var(--text-secondary); line-height: 1.6;">{{ story.summary }}</p>
+        {% endif %}
+        <div style="margin-top: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;">
+            <span class="badge badge-category">{{ articles|length }} article{{ articles|length|pluralize }}</span>
+            {% if story.primary_incident %}
+            <a href="{% url 'incident_detail' story.primary_incident.pk %}" class="badge" style="font-size: 12px; text-decoration: none;">Primary incident: {{ story.primary_incident.incident_type }}</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <h2 style="margin: 0 0 12px 0; font-size: 16px; color: var(--text-primary);">Articles in this story</h2>
+    <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 28px;">
+        {% for art in articles %}
+        <div class="card" style="padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;">
+                <div style="flex: 1; min-width: 0;">
+                    <a href="{% url 'article_detail' art.pk %}" style="font-size: 16px; font-weight: 600; color: var(--accent-primary); text-decoration: none;">{{ art.title }}</a>
+                    <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">
+                        {{ art.source.name }}
+                        {% if art.published_date %} · {{ art.published_date|date:"M d, Y H:i" }}{% endif %}
+                        {% if art.author %} · {{ art.author }}{% endif %}
+                    </div>
+                </div>
+                <a href="{% url 'article_detail' art.pk %}" class="btn btn-sm">View →</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if incidents %}
+    <h2 style="margin: 0 0 12px 0; font-size: 16px; color: var(--text-primary);">Related incidents</h2>
+    <div class="card" style="margin-bottom: 24px;">
+        <ul style="margin: 0; padding-left: 20px; list-style: none; padding-left: 0;">
+            {% for inc in incidents %}
+            <li style="padding: 10px 0; border-bottom: 1px solid var(--border-subtle);">
+                <a href="{% url 'incident_detail' inc.pk %}" style="font-size: 14px; color: var(--accent-primary); text-decoration: none;">{{ inc.incident_type }}</a>
+                <span class="badge badge-{{ inc.severity }}" style="font-size: 10px; margin-left: 8px;">{{ inc.get_severity_display }}</span>
+                <span style="font-size: 12px; color: var(--text-muted);"> — {{ inc.location_name|default:"Unknown" }} · {{ inc.get_region_display }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

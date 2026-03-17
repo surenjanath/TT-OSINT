@@ -1,0 +1,772 @@
+{% extends "base.html" %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- Modern KPI Strip -->
+<div class="kpi-grid">
+    <div class="kpi-card info">
+        <div class="kpi-content">
+            <div class="kpi-label">TOTAL INCIDENTS</div>
+            <div class="kpi-value">{{ total_incidents }}</div>
+        </div>
+    </div>
+    <div class="kpi-card warning">
+        <div class="kpi-content">
+            <div class="kpi-label">TODAY</div>
+            <div class="kpi-value">{{ incidents_today }}</div>
+        </div>
+    </div>
+    <div class="kpi-card info">
+        <div class="kpi-content">
+            <div class="kpi-label">THIS WEEK</div>
+            <div class="kpi-value">{{ incidents_week }}</div>
+        </div>
+    </div>
+    <div class="kpi-card danger">
+        <div class="kpi-content">
+            <div class="kpi-label">CRITICAL/HIGH</div>
+            <div class="kpi-value">{{ critical_count|add:high_count }}</div>
+        </div>
+    </div>
+    <div class="kpi-card success">
+        <div class="kpi-content">
+            <div class="kpi-label">ACTIVE SOURCES</div>
+            <div class="kpi-value">{{ sources_count }}</div>
+        </div>
+    </div>
+    <div class="kpi-card info">
+        <div class="kpi-content">
+            <div class="kpi-label">AVG/DAY (30d)</div>
+            <div class="kpi-value">{{ avg_incidents_per_day }}</div>
+        </div>
+    </div>
+    <div class="kpi-card {% if week_over_week_pct >= 0 %}danger{% else %}success{% endif %}">
+        <div class="kpi-content">
+            <div class="kpi-label">WEEK vs LAST</div>
+            <div class="kpi-value">{{ week_over_week_pct }}%</div>
+        </div>
+    </div>
+    <div class="kpi-card {% if month_over_month_pct >= 0 %}danger{% else %}success{% endif %}">
+        <div class="kpi-content">
+            <div class="kpi-label">MONTH vs LAST</div>
+            <div class="kpi-value">{{ month_over_month_pct }}%</div>
+        </div>
+    </div>
+    <div class="kpi-card info">
+        <div class="kpi-content">
+            <div class="kpi-label">TOTAL ARTICLES</div>
+            <div class="kpi-value">{{ articles_count }}</div>
+        </div>
+    </div>
+    <div class="kpi-card info">
+        <div class="kpi-content">
+            <div class="kpi-label">AVG AI CONFIDENCE</div>
+            <div class="kpi-value kpi-gauge-wrap">
+                <span class="kpi-gauge-value">{{ avg_confidence }}</span>
+                <span class="kpi-gauge-unit">%</span>
+            </div>
+            <div class="kpi-sub confidence-gauge-mini">
+                <span class="confidence-gauge-fill" style="width:{{ avg_confidence }}%;"></span>
+            </div>
+        </div>
+    </div>
+    <div class="kpi-card success">
+        <div class="kpi-content">
+            <div class="kpi-label">RESOLVED</div>
+            <div class="kpi-value">{{ resolved_count }}</div>
+        </div>
+    </div>
+    <div class="kpi-card info">
+        <div class="kpi-content">
+            <div class="kpi-label">VALUE STOLEN (TTD)</div>
+            <div class="kpi-value">{% if value_stolen_total %}{{ value_stolen_total|floatformat:0 }}{% else %}—{% endif %}</div>
+        </div>
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 340px;gap:20px;margin-top:20px;">
+    <!-- Main Analytics Column -->
+    <div style="display:flex;flex-direction:column;gap:20px;">
+        <!-- Trend Chart -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📈 Incident Intelligence Trend (30 Days)</h3>
+            </div>
+            <div class="card-body chart-container" style="height:300px;">
+                <canvas id="chart-trend"
+                    data-labels='[{% for d in daily_counts %}"{{ d.label }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    data-values='[{% for d in daily_counts %}{{ d.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                ></canvas>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <!-- Category Breakdown (Donut) -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>📂 Category Distribution</h3>
+                </div>
+                <div class="card-body chart-container" style="height:250px;">
+                    <canvas id="chart-category-donut"
+                        data-labels='[{% for c in by_category %}"{{ c.name }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                        data-values='[{% for c in by_category %}{{ c.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    ></canvas>
+                </div>
+            </div>
+
+            <!-- Severity Breakdown -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>⚠️ Severity distribution</h3>
+                </div>
+                <div class="card-body chart-container" style="height:250px;">
+                    <canvas id="chart-severity"
+                        data-labels='[{% for s in by_severity %}"{{ s.severity|title }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                        data-values='[{% for s in by_severity %}{{ s.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    ></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Articles & Incidents per Day (30 Days) -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📥 News Articles & Incidents per Day (30 Days)</h3>
+            </div>
+            <div class="card-body chart-container" style="height:220px;">
+                <canvas id="chart-articles"
+                    data-labels='[{% for a in article_counts %}"{{ a.label }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    data-articles='[{% for a in article_counts %}{{ a.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    data-incidents='[{% for d in daily_counts %}{{ d.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                ></canvas>
+            </div>
+        </div>
+
+        <!-- Regional Ingestion -->
+        <div class="card">
+            <div class="card-header">
+                <h3>🌍 Territorial Distribution</h3>
+            </div>
+            <div class="card-body chart-container" style="height:250px;">
+                <canvas id="chart-region"
+                    data-labels='[{% for r in by_region %}"{{ r.name }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    data-values='[{% for r in by_region %}{{ r.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                ></canvas>
+            </div>
+        </div>
+
+        <!-- Premises Type (Phase 4) -->
+        {% if by_premises %}
+        <div class="card">
+            <div class="card-header">
+                <h3>🏢 Premises Type</h3>
+            </div>
+            <div class="card-body chart-container" style="height:220px;">
+                <canvas id="chart-premises"
+                    data-labels='[{% for p in by_premises %}"{{ p.premises_type|title }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    data-values='[{% for p in by_premises %}{{ p.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                ></canvas>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if person_demographics.by_gender or person_demographics.by_condition or person_demographics.age_buckets %}
+        <div class="card">
+            <div class="card-header">
+                <h3>👥 Persons / Victim Demographics</h3>
+            </div>
+            <div class="card-body" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+                {% if person_demographics.by_gender %}
+                <div class="chart-container" style="height:200px;">
+                    <canvas id="chart-person-gender"
+                        data-labels='[{% for g in person_demographics.by_gender %}"{{ g.name|title }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                        data-values='[{% for g in person_demographics.by_gender %}{{ g.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    ></canvas>
+                </div>
+                {% endif %}
+                {% if person_demographics.by_condition %}
+                <div class="chart-container" style="height:200px;">
+                    <canvas id="chart-person-condition"
+                        data-labels='[{% for c in person_demographics.by_condition %}"{{ c.name|title }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                        data-values='[{% for c in person_demographics.by_condition %}{{ c.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    ></canvas>
+                </div>
+                {% endif %}
+                {% if person_demographics.age_buckets %}
+                <div class="chart-container" style="height:200px;">
+                    <canvas id="chart-person-age"
+                        data-labels='["0-17","18-30","31-50","51+"]'
+                        data-values='[{% for b in person_demographics.age_buckets %}{{ b.1 }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    ></canvas>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <!-- Day of Week -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>📅 Day of Week</h3>
+                </div>
+                <div class="card-body chart-container" style="height:220px;">
+                    <canvas id="chart-weekday"
+                        data-labels='[{% for w in by_weekday %}"{{ w.name }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                        data-values='[{% for w in by_weekday %}{{ w.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    ></canvas>
+                </div>
+            </div>
+            <!-- Hour of Day -->
+            <div class="card">
+                <div class="card-header">
+                    <h3>🕐 Hour of Day</h3>
+                </div>
+                <div class="card-body chart-container" style="height:220px;">
+                    <canvas id="chart-hour"
+                        data-labels='[{% for h in by_hour %}"{{ h.hour }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                        data-values='[{% for h in by_hour %}{{ h.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    ></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Confidence Distribution -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📊 Confidence Score Distribution</h3>
+            </div>
+            <div class="card-body chart-container" style="height:220px;">
+                <canvas id="chart-confidence"
+                    data-labels='[{% for b in confidence_buckets %}"{{ b.label }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    data-values='[{% for b in confidence_buckets %}{{ b.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                ></canvas>
+            </div>
+        </div>
+
+        <!-- Resolution Rate (Approved / Pending / Rejected) -->
+        <div class="card">
+            <div class="card-header">
+                <h3>✅ Resolution Rate</h3>
+            </div>
+            <div class="card-body chart-container" style="height:220px;">
+                <canvas id="chart-resolution"
+                    data-labels='[{% for r in resolution_stats %}"{{ r.label }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    data-values='[{% for r in resolution_stats %}{{ r.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                ></canvas>
+            </div>
+        </div>
+
+        <!-- Source Performance (articles + incidents per source) -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📰 Source Performance</h3>
+            </div>
+            <div class="card-body chart-container" style="height:260px;">
+                <canvas id="chart-source-perf"></canvas>
+            </div>
+        </div>
+
+        <!-- Category Trend (8 weeks stacked) -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📈 Category Trend (8 Weeks)</h3>
+            </div>
+            <div class="card-body chart-container" style="height:260px;">
+                <canvas id="chart-category-trend"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar: Hotspots & Sources -->
+    <div style="display:flex;flex-direction:column;gap:20px;">
+        <!-- Top Active Zones (Hotspots) -->
+        <div class="card">
+            <div class="card-header">
+                <h3>🔥 Top Active Zones</h3>
+            </div>
+            <div class="card-body" style="padding:0;">
+                <div class="hotspot-list">
+                    {% for loc in top_locations %}
+                    <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div style="font-size:13px;font-weight:600;color:var(--text-primary);">{{ loc.location_name }}</div>
+                            <div style="font-size:11px;color:var(--text-muted);">{{ loc.region_display|default:loc.region }}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:14px;font-weight:700;color:var(--accent);">{{ loc.count }}</div>
+                            <div style="font-size:9px;text-transform:uppercase;color:var(--text-muted);">Events</div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">No hotspot data available.</div>
+                    {% endfor %}
+                </div>
+                <div style="padding:10px;text-align:center;">
+                    <a href="{% url 'incident_list' %}" style="font-size:12px;color:var(--accent);">View all incidents →</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Incident Types -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📋 Top Incident Types</h3>
+            </div>
+            <div class="card-body" style="padding:0;">
+                <div class="hotspot-list">
+                    {% for t in top_incident_types %}
+                    <div style="padding:12px 14px;border-bottom:1px solid var(--border-default);display:flex;justify-content:space-between;align-items:center;">
+                        <div style="font-size:12px;font-weight:600;color:var(--text-primary);flex:1;min-width:0;" title="{{ t.name }}">{{ t.name|truncatechars:28 }}</div>
+                        <div style="text-align:right;font-size:14px;font-weight:700;color:var(--accent-primary);margin-left:8px;">{{ t.count }}</div>
+                    </div>
+                    {% empty %}
+                    <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:12px;">No data yet.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Sources -->
+        <div class="card">
+            <div class="card-header">
+                <h3>📰 Intelligence Sources</h3>
+            </div>
+            <div class="card-body chart-container" style="height:220px;padding:10px;">
+                <canvas id="chart-sources"
+                    data-labels='[{% for s in top_sources %}"{{ s.primary_article__source__name }}"{% if not forloop.last %},{% endif %}{% endfor %}]'
+                    data-values='[{% for s in top_sources %}{{ s.count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                ></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ source_performance|json_script:"source-perf-data" }}
+{{ category_trend_weeks|json_script:"category-trend-data" }}
+
+<!-- Data Freshness Bar -->
+<div class="card data-freshness-bar" style="margin-top:20px;">
+    <div class="card-body" style="display:flex;flex-wrap:wrap;gap:20px;align-items:center;padding:12px 16px;">
+        <span style="font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);">Data freshness</span>
+        {% if data_freshness.last_article_at %}
+        <span style="font-size:13px;color:var(--text-secondary);">Last article: <strong>{{ data_freshness.last_article_at|timesince }}</strong> ago</span>
+        {% else %}
+        <span style="font-size:13px;color:var(--text-muted);">Last article: —</span>
+        {% endif %}
+        {% if data_freshness.last_incident_at %}
+        <span style="font-size:13px;color:var(--text-secondary);">Last incident: <strong>{{ data_freshness.last_incident_at|timesince }}</strong> ago</span>
+        {% else %}
+        <span style="font-size:13px;color:var(--text-muted);">Last incident: —</span>
+        {% endif %}
+        {% if median_response_hours is not None %}
+        <span style="font-size:13px;color:var(--text-secondary);">Median response: <strong>{{ median_response_hours }}h</strong></span>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block inline_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    function destroyChart(canvas) {
+        if (typeof Chart === 'undefined' || !Chart.getChart) return;
+        var existing = Chart.getChart(canvas);
+        if (existing) existing.destroy();
+    }
+
+    const ctxTrend = document.getElementById('chart-trend');
+    const ctxCategory = document.getElementById('chart-category-donut');
+    const ctxSeverity = document.getElementById('chart-severity');
+    const ctxRegion = document.getElementById('chart-region');
+    const ctxPremises = document.getElementById('chart-premises');
+    const ctxPersonGender = document.getElementById('chart-person-gender');
+    const ctxPersonCondition = document.getElementById('chart-person-condition');
+    const ctxPersonAge = document.getElementById('chart-person-age');
+    const ctxSources = document.getElementById('chart-sources');
+    const ctxArticles = document.getElementById('chart-articles');
+    const ctxWeekday = document.getElementById('chart-weekday');
+    const ctxHour = document.getElementById('chart-hour');
+    const ctxConfidence = document.getElementById('chart-confidence');
+
+    const chartColors = [
+        '#00c896', '#8b5cf6', '#f59e0b', '#3b82f6', '#ef4444', 
+        '#06b6d4', '#ec4899', '#f97316', '#64748b'
+    ];
+
+    // Trend Line Chart
+    if (ctxTrend) destroyChart(ctxTrend);
+    new Chart(ctxTrend, {
+        type: 'line',
+        data: {
+            labels: JSON.parse(ctxTrend.dataset.labels),
+            datasets: [{
+                label: 'Incidents',
+                data: JSON.parse(ctxTrend.dataset.values),
+                borderColor: '#00c896',
+                backgroundColor: 'rgba(0, 200, 150, 0.1)',
+                fill: true,
+                tension: 0.4,
+                borderWidth: 3,
+                pointRadius: 4,
+                pointBackgroundColor: '#00c896'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Category Donut Chart
+    if (ctxCategory) destroyChart(ctxCategory);
+    new Chart(ctxCategory, {
+        type: 'doughnut',
+        data: {
+            labels: JSON.parse(ctxCategory.dataset.labels),
+            datasets: [{
+                data: JSON.parse(ctxCategory.dataset.values),
+                backgroundColor: chartColors,
+                borderWidth: 0,
+                hoverOffset: 15
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: { position: 'right', labels: { boxWidth: 12, font: { size: 11 } } }
+            }
+        }
+    });
+
+    // Severity Bar Chart
+    if (ctxSeverity) destroyChart(ctxSeverity);
+    new Chart(ctxSeverity, {
+        type: 'bar',
+        data: {
+            labels: JSON.parse(ctxSeverity.dataset.labels),
+            datasets: [{
+                data: JSON.parse(ctxSeverity.dataset.values),
+                backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#dc2626'],
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                x: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Region Horizontal Bar
+    if (ctxRegion) destroyChart(ctxRegion);
+    new Chart(ctxRegion, {
+        type: 'bar',
+        data: {
+            labels: JSON.parse(ctxRegion.dataset.labels),
+            datasets: [{
+                data: JSON.parse(ctxRegion.dataset.values),
+                backgroundColor: 'rgba(139, 92, 246, 0.7)',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            indexAxis: 'y',
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                y: { grid: { display: false } }
+            }
+        }
+    });
+
+    // Premises Type (Phase 4)
+    if (ctxPremises) {
+        destroyChart(ctxPremises);
+        new Chart(ctxPremises, {
+            type: 'bar',
+            data: {
+                labels: JSON.parse(ctxPremises.dataset.labels),
+                datasets: [{
+                    data: JSON.parse(ctxPremises.dataset.values),
+                    backgroundColor: chartColors.slice(0, JSON.parse(ctxPremises.dataset.labels).length),
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    y: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    function makeDonut(ctx, labels, values) {
+        if (!ctx) return;
+        destroyChart(ctx);
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: typeof labels === 'string' ? JSON.parse(labels) : labels,
+                datasets: [{
+                    data: typeof values === 'string' ? JSON.parse(values) : values,
+                    backgroundColor: chartColors,
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'bottom' } },
+                cutout: '60%'
+            }
+        });
+    }
+    if (ctxPersonGender) makeDonut(ctxPersonGender, ctxPersonGender.dataset.labels, ctxPersonGender.dataset.values);
+    if (ctxPersonCondition) makeDonut(ctxPersonCondition, ctxPersonCondition.dataset.labels, ctxPersonCondition.dataset.values);
+    if (ctxPersonAge) makeDonut(ctxPersonAge, ctxPersonAge.dataset.labels, ctxPersonAge.dataset.values);
+
+    // Sources Radar/Polar (using Polar Area for multiple sources)
+    if (ctxSources) destroyChart(ctxSources);
+    new Chart(ctxSources, {
+        type: 'polarArea',
+        data: {
+            labels: JSON.parse(ctxSources.dataset.labels),
+            datasets: [{
+                data: JSON.parse(ctxSources.dataset.values),
+                backgroundColor: chartColors.map(c => c + '88'),
+                borderColor: chartColors,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                r: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { display: false } }
+            }
+        }
+    });
+
+    // Articles & Incidents per Day (bar, dual series)
+    if (ctxArticles && ctxArticles.dataset.labels) {
+        destroyChart(ctxArticles);
+        var articlesData = ctxArticles.dataset.articles ? JSON.parse(ctxArticles.dataset.articles) : [];
+        var incidentsData = ctxArticles.dataset.incidents ? JSON.parse(ctxArticles.dataset.incidents) : [];
+        new Chart(ctxArticles, {
+            type: 'bar',
+            data: {
+                labels: JSON.parse(ctxArticles.dataset.labels),
+                datasets: [
+                    {
+                        label: 'Articles',
+                        data: articlesData,
+                        backgroundColor: 'rgba(6, 182, 212, 0.6)',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Incidents',
+                        data: incidentsData,
+                        backgroundColor: 'rgba(245, 158, 11, 0.6)',
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: true, position: 'top' } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // Day of Week (bar)
+    if (ctxWeekday && ctxWeekday.dataset.labels) {
+        destroyChart(ctxWeekday);
+        new Chart(ctxWeekday, {
+            type: 'bar',
+            data: {
+                labels: JSON.parse(ctxWeekday.dataset.labels),
+                datasets: [{
+                    data: JSON.parse(ctxWeekday.dataset.values),
+                    backgroundColor: 'rgba(139, 92, 246, 0.7)',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // Hour of Day (bar)
+    if (ctxHour && ctxHour.dataset.labels) {
+        destroyChart(ctxHour);
+        new Chart(ctxHour, {
+            type: 'bar',
+            data: {
+                labels: JSON.parse(ctxHour.dataset.labels),
+                datasets: [{
+                    data: JSON.parse(ctxHour.dataset.values),
+                    backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+    }
+
+    // Confidence Distribution (doughnut)
+    if (ctxConfidence && ctxConfidence.dataset.labels) {
+        destroyChart(ctxConfidence);
+        new Chart(ctxConfidence, {
+            type: 'doughnut',
+            data: {
+                labels: JSON.parse(ctxConfidence.dataset.labels),
+                datasets: [{
+                    data: JSON.parse(ctxConfidence.dataset.values),
+                    backgroundColor: ['#ef4444', '#f59e0b', '#eab308', '#22c55e'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
+                plugins: { legend: { position: 'right' } }
+            }
+        });
+    }
+
+    // Resolution Rate (doughnut)
+    const ctxResolution = document.getElementById('chart-resolution');
+    if (ctxResolution && ctxResolution.dataset.labels) {
+        destroyChart(ctxResolution);
+        new Chart(ctxResolution, {
+            type: 'doughnut',
+            data: {
+                labels: JSON.parse(ctxResolution.dataset.labels),
+                datasets: [{
+                    data: JSON.parse(ctxResolution.dataset.values),
+                    backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '60%',
+                plugins: { legend: { position: 'right' } }
+            }
+        });
+    }
+
+    // Source Performance (horizontal bar: articles + incidents)
+    const sourcePerfEl = document.getElementById('chart-source-perf');
+    const sourcePerfData = document.getElementById('source-perf-data');
+    if (sourcePerfEl && sourcePerfData) {
+        const sourcePerf = JSON.parse(sourcePerfData.textContent);
+        if (sourcePerf.length) {
+            destroyChart(sourcePerfEl);
+            new Chart(sourcePerfEl, {
+                type: 'bar',
+                data: {
+                    labels: sourcePerf.map(s => s.name.length > 18 ? s.name.substring(0, 18) + '…' : s.name),
+                    datasets: [
+                        { label: 'Articles', data: sourcePerf.map(s => s.articles), backgroundColor: 'rgba(6, 182, 212, 0.6)', borderRadius: 4 },
+                        { label: 'Incidents', data: sourcePerf.map(s => s.incidents), backgroundColor: 'rgba(139, 92, 246, 0.7)', borderRadius: 4 }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'top' } },
+                    scales: {
+                        x: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        y: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+    }
+
+    // Category Trend (8 weeks stacked area)
+    const categoryTrendEl = document.getElementById('chart-category-trend');
+    const categoryTrendData = document.getElementById('category-trend-data');
+    if (categoryTrendEl && categoryTrendData) {
+        const ct = JSON.parse(categoryTrendData.textContent);
+        if (ct.labels && ct.datasets && ct.datasets.length) {
+            destroyChart(categoryTrendEl);
+            const stackColors = ['#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#10b981', '#ec4899', '#f97316', '#64748b', '#3b82f6', '#14b8a6'];
+            new Chart(categoryTrendEl, {
+                type: 'line',
+                data: {
+                    labels: ct.labels,
+                    datasets: ct.datasets.map((ds, i) => ({
+                        label: ds.name,
+                        data: ds.data,
+                        backgroundColor: (stackColors[i] || '#64748b') + '44',
+                        borderColor: stackColors[i] || '#64748b',
+                        fill: true,
+                        tension: 0.3,
+                        borderWidth: 1,
+                        pointRadius: 2
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 10 } } } },
+                    scales: {
+                        y: { stacked: true, beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } },
+                        x: { stacked: true, grid: { display: false } }
+                    }
+                }
+            });
+        }
+    }
+});
+</script>
+{% endblock %}

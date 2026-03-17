@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="display:flex;gap:24px;">
+    <!-- Left: Filters -->
+    <div style="min-width:220px;max-width:220px;">
+        <form method="get" id="filterForm">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h3 style="margin:0;font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);">Advanced Filters</h3>
+                <a href="{% url 'incident_list' %}" style="font-size:12px;color:var(--accent);">Clear All</a>
+            </div>
+
+            <!-- Date Range -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:6px;">Date Range</label>
+                <input type="date" name="date_from" class="filter-input" value="{{ filters.date_from }}" style="width:100%;margin-bottom:6px;">
+                <input type="date" name="date_to" class="filter-input" value="{{ filters.date_to }}" style="width:100%;">
+            </div>
+
+            <!-- Status -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:6px;">Status</label>
+                <select name="status" class="filter-select" style="width:100%;">
+                    <option value="">Approved</option>
+                    {% for value, label in statuses %}
+                    <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                    <option value="all" {% if filters.status == 'all' %}selected{% endif %}>All Statuses</option>
+                </select>
+            </div>
+
+            <!-- Severity -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:6px;">Severity</label>
+                <select name="severity" class="filter-select" style="width:100%;">
+                    <option value="">All</option>
+                    {% for value, label in severities %}
+                    <option value="{{ value }}" {% if filters.severity == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Category -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:6px;">Category</label>
+                <select name="category" class="filter-select" style="width:100%;">
+                    <option value="">All</option>
+                    {% for value, label in categories %}
+                    <option value="{{ value }}" {% if filters.category == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Region -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:6px;">Region</label>
+                <select name="region" class="filter-select" style="width:100%;">
+                    <option value="">All Regions</option>
+                    {% for value, label in regions %}
+                    <option value="{{ value }}" {% if filters.region == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Time Preset -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:6px;">Quick Range</label>
+                <select name="time_range" class="filter-select" style="width:100%;">
+                    <option value="">All Time</option>
+                    <option value="24h" {% if filters.time_range == '24h' %}selected{% endif %}>Last 24h</option>
+                    <option value="7d" {% if filters.time_range == '7d' %}selected{% endif %}>Last 7 Days</option>
+                    <option value="30d" {% if filters.time_range == '30d' %}selected{% endif %}>Last 30 Days</option>
+                </select>
+            </div>
+
+            <!-- Resolved -->
+            <div style="margin-bottom:16px;">
+                <label style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);display:block;margin-bottom:6px;">Resolved</label>
+                <select name="is_resolved" class="filter-select" style="width:100%;">
+                    <option value="">All</option>
+                    <option value="1" {% if filters.is_resolved == '1' %}selected{% endif %}>Resolved</option>
+                    <option value="0" {% if filters.is_resolved == '0' %}selected{% endif %}>Unresolved</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width:100%;">🔍 Apply Filters</button>
+        </form>
+    </div>
+
+    <!-- Right: Main Content -->
+    <div style="flex:1;min-width:0;">
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <div>
+                <h2 style="margin:0 0 4px 0;font-size:20px;">Incident List View</h2>
+                <p style="margin:0;font-size:13px;color:var(--text-muted);">Real-time intelligence feed for Trinidad & Tobago</p>
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn" onclick="exportTableToCSV('incidents.csv')">📥 Export CSV</button>
+            </div>
+        </div>
+
+        <!-- Search -->
+        <form method="get" style="margin-bottom:16px;">
+            {% for key, val in filters.items %}
+                {% if key != 'search' and val %}<input type="hidden" name="{{ key }}" value="{{ val }}">{% endif %}
+            {% endfor %}
+            <input type="text" name="search" class="filter-input" placeholder="Search by incident ID, type, or location..."
+                   value="{{ filters.search }}" style="width:100%;padding:10px 14px;font-size:14px;">
+        </form>
+
+        <!-- Summary stats bar -->
+        <div class="stat-summary-bar">
+            <span class="stat-summary-total"><strong>{{ total_count }}</strong> incident{{ total_count|pluralize }}</span>
+            {% for s in severity_breakdown %}
+            <span class="stat-summary-badge badge badge-{{ s.severity }}">{{ s.label }}: {{ s.count }}</span>
+            {% endfor %}
+            {% for c in category_breakdown %}
+            <span class="stat-summary-badge badge badge-category" title="{{ c.label }}">{{ c.label|truncatechars:15 }}: {{ c.count }}</span>
+            {% endfor %}
+        </div>
+
+        <!-- Table -->
+        <div class="card">
+            <div class="data-table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="col-thumb">Image</th>
+                            <th><a href="{{ sort_links.severity }}" class="sort-th">Severity {% if sort_field == 'severity' %}{% if sort_order == 'desc' %}↓{% else %}↑{% endif %}{% endif %}</a></th>
+                            <th><a href="{{ sort_links.incident_type }}" class="sort-th">Incident Type {% if sort_field == 'incident_type' %}{% if sort_order == 'desc' %}↓{% else %}↑{% endif %}{% endif %}</a></th>
+                            <th><a href="{{ sort_links.location_name }}" class="sort-th">Location {% if sort_field == 'location_name' %}{% if sort_order == 'desc' %}↓{% else %}↑{% endif %}{% endif %}</a></th>
+                            <th><a href="{{ sort_links.region }}" class="sort-th">Region {% if sort_field == 'region' %}{% if sort_order == 'desc' %}↓{% else %}↑{% endif %}{% endif %}</a></th>
+                            <th><a href="{{ sort_links.incident_date }}" class="sort-th">Date / Time {% if sort_field == 'incident_date' %}{% if sort_order == 'desc' %}↓{% else %}↑{% endif %}{% endif %}</a></th>
+                            <th>Source</th>
+                            <th>Status</th>
+                            <th><a href="{{ sort_links.confidence_score }}" class="sort-th">Confidence {% if sort_field == 'confidence_score' %}{% if sort_order == 'desc' %}↓{% else %}↑{% endif %}{% endif %}</a></th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inc in incidents %}
+                        <tr>
+                            <td class="col-thumb">
+                                {% if inc.primary_article and inc.primary_article.image_url %}
+                                <img src="{{ inc.primary_article.image_url }}" alt="" class="incident-thumb" loading="lazy" />
+                                {% else %}
+                                <span class="no-thumb">—</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ inc.severity }}">{{ inc.get_severity_display }}</span>
+                            </td>
+                            <td>
+                                <strong style="color:var(--text-primary);">{{ inc.incident_type }}</strong>
+                            </td>
+                            <td>{{ inc.location_name|default:"—" }}</td>
+                            <td>{{ inc.get_region_display }}</td>
+                            <td style="font-family:var(--font-mono);font-size:11px;white-space:nowrap;">
+                                {% if inc.incident_date %}
+                                {{ inc.incident_date|date:"M d, H:i" }}
+                                {% else %}—{% endif %}
+                            </td>
+                            <td>
+                                {% if inc.primary_article and inc.primary_article.source %}
+                                <span style="font-size:12px;padding:2px 8px;border-radius:4px;background:var(--surface-alt);color:var(--text-secondary);">{{ inc.primary_article.source.name|truncatechars:12 }}</span>
+                                {% if inc.article_count > 1 %}
+                                <span class="badge badge-category" style="font-size:10px;margin-left:4px;" title="{{ inc.article_count }} source articles">{{ inc.article_count }} art.</span>
+                                {% endif %}
+                                {% else %}—{% endif %}
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ inc.status }}">{{ inc.get_status_display }}</span>
+                                {% if inc.is_resolved %}<span class="badge" style="font-size:10px;margin-left:4px;background:var(--accent-success);color:#fff;">Resolved</span>{% endif %}
+                            </td>
+                            <td>
+                                <span class="confidence-bar">
+                                    <span class="confidence-fill {% if inc.confidence_score >= 80 %}confidence-high{% elif inc.confidence_score >= 50 %}confidence-med{% else %}confidence-low{% endif %}"
+                                          style="width:{{ inc.confidence_score }}%"></span>
+                                </span>
+                                <span style="font-family:var(--font-mono);font-size:11px;">{{ inc.confidence_score|floatformat:0 }}%</span>
+                            </td>
+                            <td>
+                                <a href="{% url 'incident_detail' inc.pk %}" class="btn btn-sm">View →</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="10">
+                                <div class="empty-state">
+                                    <div class="empty-icon">📋</div>
+                                    <p>No incidents match your filters.</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;">
+            <div style="font-size:13px;color:var(--text-muted);">
+                Showing <strong style="color:var(--text-primary);">{{ page_obj.start_index }}</strong> to
+                <strong style="color:var(--text-primary);">{{ page_obj.end_index }}</strong>
+                of <strong style="color:var(--text-primary);">{{ total_count }}</strong> incidents
+            </div>
+            <div style="display:flex;gap:4px;align-items:center;">
+                {% if page_obj.has_previous %}
+                <a href="?page={{ page_obj.previous_page_number }}{% for k, v in filters.items %}{% if v %}&{{ k }}={{ v }}{% endif %}{% endfor %}"
+                   class="btn btn-sm">‹</a>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if num == page_obj.number %}
+                        <span class="btn btn-sm btn-primary" style="cursor:default;">{{ num }}</span>
+                    {% elif num == 1 or num == page_obj.paginator.num_pages or num >= page_obj.number|add:"-2" and num <= page_obj.number|add:"2" %}
+                        <a href="?page={{ num }}{% for k, v in filters.items %}{% if v %}&{{ k }}={{ v }}{% endif %}{% endfor %}"
+                           class="btn btn-sm">{{ num }}</a>
+                    {% elif num == page_obj.number|add:"-3" or num == page_obj.number|add:"3" %}
+                        <span style="color:var(--text-muted);padding:0 4px;">…</span>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% for k, v in filters.items %}{% if v %}&{{ k }}={{ v }}{% endif %}{% endfor %}"
+                   class="btn btn-sm">›</a>
+                {% endif %}
+            </div>
+        </div>
+        {% else %}
+        <div style="margin-top:12px;font-size:13px;color:var(--text-muted);">
+            Showing <strong style="color:var(--text-primary);">{{ total_count }}</strong> incidents
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

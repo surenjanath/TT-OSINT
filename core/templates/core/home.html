@@ -1,0 +1,491 @@
+{% extends "base.html" %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- KPI Strip — compact 2 rows -->
+<div class="kpi-grid" style="grid-template-columns:repeat(6,1fr);">
+    <div class="kpi-card danger">
+        <div class="kpi-content">
+            <div class="kpi-label">INCIDENTS</div>
+            <div class="kpi-value" id="kpi-total">{{ total_incidents }}</div>
+        </div>
+    </div>
+    <div class="kpi-card info">
+        <div class="kpi-content">
+            <div class="kpi-label">TODAY</div>
+            <div class="kpi-value" id="kpi-today">{{ incidents_today }}</div>
+            {% if yesterday_count is not None %}
+            <div class="kpi-sub">
+                {% if incidents_today > yesterday_count %}<span style="color:var(--accent-danger);">&#x2191; vs yesterday</span>
+                {% elif incidents_today < yesterday_count %}<span style="color:var(--accent-success);">&#x2193; vs yesterday</span>
+                {% else %}&mdash; vs yesterday{% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <div class="kpi-card info">
+        <div class="kpi-content">
+            <div class="kpi-label">THIS WEEK</div>
+            <div class="kpi-value">{{ incidents_week }}</div>
+            <div class="kpi-sub">
+                {% if week_over_week_change > 0 %}<span style="color:var(--accent-danger);">&#x2191; {{ week_over_week_change }}%</span>
+                {% elif week_over_week_change < 0 %}<span style="color:var(--accent-success);">&#x2193; {{ week_over_week_change|stringformat:"d"|slice:"1:" }}%</span>
+                {% else %}&mdash; vs last week{% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="kpi-card warning">
+        <div class="kpi-content">
+            <div class="kpi-label">CRITICAL / HIGH</div>
+            <div class="kpi-value" style="display:flex;gap:6px;align-items:baseline;">
+                <span style="color:var(--severity-critical);" id="kpi-critical">{{ critical_count }}</span>
+                <span style="font-size:14px;color:var(--text-muted);">/</span>
+                <span style="color:var(--severity-high);" id="kpi-high">{{ high_count }}</span>
+            </div>
+        </div>
+    </div>
+    <div class="kpi-card danger">
+        <div class="kpi-content">
+            <div class="kpi-label">FATALITIES</div>
+            <div class="kpi-value">{{ total_fatalities }}</div>
+        </div>
+    </div>
+    <div class="kpi-card info">
+        <div class="kpi-content">
+            <div class="kpi-label">ARTICLES</div>
+            <div class="kpi-value">{{ articles_total }}</div>
+            <div class="kpi-sub" id="kpi-unprocessed">{{ articles_unprocessed }} unprocessed</div>
+        </div>
+    </div>
+</div>
+
+<!-- Data Freshness Bar -->
+<div class="data-freshness-bar">
+    <span>Last scraped: <strong>{% if last_article_time %}{{ last_article_time|timesince }} ago{% else %}Never{% endif %}</strong></span>
+    <span>Mapped: <strong>{{ total_mapped }}</strong></span>
+    <span>Pending: <strong id="kpi-pending">{{ incidents_pending }}</strong></span>
+    <span>Sources: <strong>{{ active_sources.count }}</strong></span>
+    <span>Victims: <strong>{{ total_victims }}</strong></span>
+</div>
+
+<!-- Map + Feed Layout -->
+<div class="map-layout">
+    <!-- Map Area -->
+    <div class="map-container" style="position:relative;">
+        <div id="incident-map"></div>
+
+        <!-- Top-center: live incident count badge -->
+        <div class="map-counter-badge" id="map-incident-count-badge">0 Incidents Mapped</div>
+
+        <!-- Fullscreen toggle -->
+        <button type="button" class="map-fullscreen-btn" id="btn-map-fullscreen" onclick="toggleMapFullscreen()" title="Toggle fullscreen" aria-label="Toggle fullscreen">&#x26F6;</button>
+
+        <!-- Filter Overlay (Floating top-right) -->
+        <div class="map-overlay">
+            <div class="map-filter-panel">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+                    <h4 style="margin:0;font-size:13px;">Filter</h4>
+                    <div class="auto-refresh-badge">
+                        <span class="auto-refresh-dot"></span> Live
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>View</label>
+                    <div class="btn-group" style="display:flex;width:100%;">
+                        <button class="btn btn-sm btn-primary" id="btn-view-markers" onclick="setMapView('markers')" style="flex:1;">Map</button>
+                        <button class="btn btn-sm" id="btn-view-heatmap" onclick="setMapView('heatmap')" style="flex:1;">Heatmap</button>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Date Range</label>
+                    <div style="display:flex;gap:4px;">
+                        <input type="date" id="filter-date-from" class="filter-select" style="flex:1;font-size:11px;" onchange="applyMapFilters()">
+                        <input type="date" id="filter-date-to" class="filter-select" style="flex:1;font-size:11px;" onchange="applyMapFilters()">
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <label>Quick</label>
+                    <select id="filter-time" class="filter-select" onchange="applyMapFilters()">
+                        <option value="">All Time</option>
+                        <option value="24h">Last 24 Hours</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Category</label>
+                    <select id="filter-category" class="filter-select" onchange="applyMapFilters()">
+                        <option value="">All Categories</option>
+                        {% for value, label in categories %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Severity</label>
+                    <select id="filter-severity" class="filter-select" onchange="applyMapFilters()">
+                        <option value="">All</option>
+                        {% for value, label in severities %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <label>Region</label>
+                    <select id="filter-region" class="filter-select" onchange="applyMapFilters()">
+                        <option value="">All Regions</option>
+                        {% for value, label in regions %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <hr style="margin:8px 0;border:none;border-top:1px solid var(--border);">
+
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+                    <button class="btn btn-primary btn-sm" onclick="applyMapFilters()">Apply</button>
+                    <button class="btn btn-sm" onclick="clearMapFilters()">Clear</button>
+                </div>
+
+                <div style="margin-top:6px;">
+                    <a href="#" class="btn btn-sm" onclick="exportCSV(event)" style="width:100%;text-align:center;display:block;padding:5px;font-size:11px;border-color:rgba(16,124,65,.3);color:#107c41;background:rgba(16,124,65,.05);">Export CSV</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Map legend: severity colors (bottom-left) -->
+        <div class="map-legend-overlay">
+            <div class="map-legend-title">Severity</div>
+            <div class="map-legend-row"><span class="map-legend-dot map-legend-low"></span> Low</div>
+            <div class="map-legend-row"><span class="map-legend-dot map-legend-medium"></span> Medium</div>
+            <div class="map-legend-row"><span class="map-legend-dot map-legend-high"></span> High</div>
+            <div class="map-legend-row"><span class="map-legend-dot map-legend-critical"></span> Critical</div>
+            <div class="map-legend-note">Size = severity</div>
+        </div>
+    </div>
+
+    <!-- Right: Intelligence Feed Sidebar (7-Day Trend, Severity, Recent Incidents only) -->
+    <div class="map-feed-sidebar">
+        <!-- Sparkline Trend -->
+        <div class="card" style="margin-bottom:12px;">
+            <div class="card-header" style="padding:8px 12px;">
+                <h3 style="font-size:12px;">7-Day Trend</h3>
+            </div>
+            <div class="card-body" style="height:60px;padding:6px 10px;">
+                <canvas id="chart-sparkline"
+                    data-values='[{% for count in sparkline_data %}{{ count }}{% if not forloop.last %},{% endif %}{% endfor %}]'
+                ></canvas>
+            </div>
+        </div>
+
+        <!-- Severity Summary (stacked bar) -->
+        <div class="card home-severity-card" style="margin-bottom:12px;">
+            <div class="card-header" style="padding:8px 12px;">
+                <h3 style="font-size:12px;">Severity</h3>
+            </div>
+            <div class="card-body" style="padding:8px 12px;">
+                <div class="severity-stacked-bar" style="height:10px;border-radius:2px;overflow:hidden;display:flex;width:100%;">
+                    {% for s in severity_breakdown %}
+                    <span class="severity-segment severity-{{ s.severity }}" style="width:{{ s.pct }}%;" title="{{ s.label }}: {{ s.count }}"></span>
+                    {% endfor %}
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:6px;font-size:10px;color:var(--text-muted);">
+                    {% for s in severity_breakdown %}
+                    <span><span class="severity-dot severity-{{ s.severity }}"></span> {{ s.label }} ({{ s.count }})</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Live Feed Container -->
+        <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;">
+                <h3 style="display:flex;align-items:center;gap:6px;font-size:12px;">
+                    <span style="display:inline-block;width:6px;height:6px;background:var(--accent-danger);border-radius:50%;box-shadow:0 0 6px var(--accent-danger);"></span>
+                    Recent Incidents
+                </h3>
+                <span style="font-size:9px;color:var(--text-muted);font-family:var(--font-mono);text-transform:uppercase;">Live</span>
+            </div>
+            <div class="card-body" style="padding:0;overflow-y:auto;flex:1;">
+                <div id="sidebar-feed">
+                    {% for inc in recent_incidents %}
+                    <div class="feed-item" onclick="window.location='{% url 'incident_detail' inc.pk %}'" 
+                         style="padding:10px 12px;border-bottom:1px solid var(--border-subtle);cursor:pointer;border-left:3px solid var(--severity-{{ inc.severity }});">
+                        <div style="display:flex;gap:8px;">
+                            {% if inc.article and inc.article.image_url %}
+                            <div style="flex-shrink:0;width:44px;height:44px;border-radius:var(--radius-sm);overflow:hidden;background:var(--bg-hover);">
+                                <img src="{{ inc.article.image_url }}" alt="" style="width:100%;height:100%;object-fit:cover;" loading="lazy" onerror="this.parentElement.style.display='none'">
+                            </div>
+                            {% endif %}
+                            <div style="flex:1;min-width:0;">
+                                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;">
+                                    <div style="font-size:12px;font-weight:700;color:var(--text-primary);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ inc.incident_type|truncatechars:35 }}</div>
+                                    <span style="font-size:9px;font-family:var(--font-mono);color:var(--text-muted);white-space:nowrap;flex-shrink:0;">
+                                        {% if inc.incident_date %}{{ inc.incident_date|timesince }} ago{% endif %}
+                                    </span>
+                                </div>
+                                <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                                    {{ inc.location_name|default:"Unknown Location"|truncatechars:35 }}
+                                </div>
+                                <div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:3px;">
+                                    <span class="badge badge-{{ inc.severity }}" style="font-size:8px;padding:1px 4px;">{{ inc.get_severity_display }}</span>
+                                    <span class="badge badge-category" style="font-size:8px;padding:1px 4px;">{{ inc.get_category_display }}</span>
+                                    {% if inc.confidence_score %}
+                                    <span style="font-size:8px;color:var(--text-muted);font-family:var(--font-mono);">{{ inc.confidence_score|floatformat:0 }}%</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="empty-state" style="padding:30px;text-align:center;">
+                        <p style="font-size:12px;color:var(--text-muted);">No recent activity detected.</p>
+                        <p style="font-size:10px;color:var(--text-muted);margin-top:6px;">Run the pipeline to populate incidents.</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div style="padding:8px 12px;border-top:1px solid var(--border);background:var(--bg-hover);">
+                <a href="{% url 'incident_list' %}" class="btn" style="width:100%;text-align:center;display:block;font-size:11px;padding:6px;">View All Incidents &rarr;</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Section below map: gap + two columns (analytics cards | quick actions + activity log) -->
+<div class="home-below-map">
+    <div class="home-below-map-cards">
+    <!-- Category Breakdown (donut) -->
+    <div class="card">
+        <div class="card-header" style="padding:8px 12px;">
+            <h3 style="font-size:12px;">Categories</h3>
+        </div>
+        <div class="card-body" style="height:160px;padding:6px 10px;">
+            <canvas id="chart-home-category"
+                data-labels="{{ category_chart_data_labels }}"
+                data-values="{{ category_chart_data_values }}"
+            ></canvas>
+        </div>
+    </div>
+
+    <!-- Threat Distribution -->
+    {% if threat_distribution %}
+    <div class="card">
+        <div class="card-header" style="padding:8px 12px;">
+            <h3 style="font-size:12px;">Threat Distribution</h3>
+        </div>
+        <div class="card-body" style="padding:8px 12px;">
+            {% if critical_count or high_count %}
+            <div style="margin-bottom:6px;">
+                <div style="display:flex;justify-content:space-between;font-size:11px;">
+                    <span>High Priority</span>
+                    <span style="color:var(--severity-critical);font-weight:600;">{% widthratio high_count|add:critical_count total_incidents 100 %}%</span>
+                </div>
+                <div style="height:4px;background:var(--bg-hover);border-radius:2px;overflow:hidden;margin-top:3px;">
+                    <div style="height:100%;background:var(--severity-critical);width:{% widthratio high_count|add:critical_count total_incidents 100 %}%;border-radius:2px;"></div>
+                </div>
+            </div>
+            {% endif %}
+            {% for item in threat_distribution %}
+            <div style="margin-bottom:4px;">
+                <div style="display:flex;justify-content:space-between;font-size:11px;">
+                    <span>{{ item.name|truncatechars:20 }}</span>
+                    <span style="font-weight:500;">{{ item.pct }}%</span>
+                </div>
+                <div style="height:3px;background:var(--bg-hover);border-radius:2px;overflow:hidden;margin-top:2px;">
+                    <div style="height:100%;background:var(--accent-primary);width:{{ item.pct }}%;border-radius:2px;opacity:.6;"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Source Health -->
+    <div class="card source-health-card">
+        <div class="card-header" style="padding:8px 12px;">
+            <h3 style="font-size:12px;">Source Health</h3>
+        </div>
+        <div class="card-body" style="padding:6px 12px;">
+            {% for s in source_health %}
+            <div class="source-health-row">
+                <span class="source-health-dot {% if s.healthy %}healthy{% else %}stale{% endif %}"></span>
+                <span class="source-health-name">{{ s.name|truncatechars:20 }}</span>
+                <span class="source-health-since">{{ s.since }}</span>
+            </div>
+            {% empty %}
+            <div style="font-size:11px;color:var(--text-muted);">No active sources.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Top Hotspots -->
+    <div class="card">
+        <div class="card-header" style="padding:8px 12px;">
+            <h3 style="font-size:12px;">Top 5 Hotspots</h3>
+        </div>
+        <div class="card-body hotspot-mini-list" style="padding:6px 12px;">
+            {% for h in top_hotspots %}
+            <a href="#" class="hotspot-item" data-region="{{ h.region }}" onclick="focusMapOnHotspot(event, '{{ h.region|escapejs }}')">
+                <span class="hotspot-name">{{ h.location_name|truncatechars:22 }}</span>
+                <span class="hotspot-meta">{{ h.region_display }} &middot; {{ h.count }}</span>
+            </a>
+            {% empty %}
+            <div style="font-size:11px;color:var(--text-muted);">No hotspot data.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Region Summary -->
+    <div class="card">
+        <div class="card-header" style="padding:8px 12px;">
+            <h3 style="font-size:12px;">Region Summary</h3>
+        </div>
+        <div class="card-body" style="padding:6px 12px;">
+            {% for r in region_breakdown %}
+            <div class="region-mini-bar-row">
+                <span class="region-mini-bar-label">{{ r.name|truncatechars:18 }}</span>
+                <span class="region-mini-bar-value">{{ r.count }}</span>
+                <div class="region-mini-bar">
+                    <span class="region-mini-bar-fill" style="width: {% widthratio r.count region_max_count 100 %}%;"></span>
+                </div>
+            </div>
+            {% empty %}
+            <div style="font-size:11px;color:var(--text-muted);">No region data.</div>
+            {% endfor %}
+        </div>
+    </div>
+    </div>
+
+    <!-- Right column: Quick Actions + Activity Log -->
+    <div class="home-quick-actions-column">
+        <div class="card">
+            <div class="card-header" style="padding:8px 12px;">
+                <h3 style="font-size:12px;">Quick Actions</h3>
+                <div class="pipeline-status idle" id="home-pipeline-indicator" style="font-size:10px;">
+                    <span class="pipeline-dot"></span>
+                    <span id="home-pipeline-status-text">Idle</span>
+                </div>
+            </div>
+            <div class="card-body" style="padding:8px 12px;">
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                    <button class="btn btn-sm btn-primary" id="home-btn-scrape" onclick="homeTriggerAction('scrape')">Scrape</button>
+                    <button class="btn btn-sm" id="home-btn-extract" onclick="homeTriggerAction('extract')" style="background:rgba(139,92,246,0.15);border-color:rgba(139,92,246,0.3);color:#8b5cf6;">AI Extract</button>
+                    <button class="btn btn-sm btn-success" id="home-btn-full" onclick="homeTriggerAction('full')">Full</button>
+                    <button class="btn btn-sm" id="home-btn-regeocode_all" onclick="homeTriggerAction('regeocode_all')" style="background:rgba(34,197,94,0.12);border-color:rgba(34,197,94,0.3);color:#16a34a;">Re-geocode</button>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="flex:1;display:flex;flex-direction:column;min-height:200px;">
+            <div class="card-header" style="padding:8px 12px;flex-shrink:0;">
+                <h3 style="font-size:12px;">Activity Log</h3>
+                <span style="font-size:10px;color:var(--text-muted);" id="home-log-count">0 entries</span>
+            </div>
+            <div class="card-body" id="home-activity-log" style="overflow-y:auto;flex:1;padding:0;min-height:180px;">
+                <div class="log-empty" id="home-log-empty">
+                    <div style="text-align:center;padding:24px;color:var(--text-muted);font-size:11px;">
+                        <p style="margin:0;">No activity yet.</p>
+                        <p style="margin:4px 0 0;">Run a quick action to see live logs.</p>
+                    </div>
+                </div>
+                <div id="home-log-entries"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block inline_scripts %}
+<script>
+setInterval(function() {
+    if (window._incidentMap) {
+        loadIncidents(window._incidentMap);
+    }
+}, 30000);
+
+window._currentMapView = 'markers';
+function setMapView(view) {
+    window._currentMapView = view;
+    document.getElementById('btn-view-markers').className = view === 'markers' ? 'btn btn-sm btn-primary' : 'btn btn-sm';
+    document.getElementById('btn-view-heatmap').className = view === 'heatmap' ? 'btn btn-sm btn-primary' : 'btn btn-sm';
+    applyMapFilters();
+}
+
+// Quick Actions + Activity Log (pipeline)
+var homePollInterval = null;
+var homeActionUrls = { scrape: '/api/pipeline/scrape/', extract: '/api/pipeline/extract/', full: '/api/pipeline/full/', regeocode_all: '/api/incidents/regeocode-all/' };
+function homeTriggerAction(action) {
+    var btn = document.getElementById('home-btn-' + action);
+    if (btn) btn.disabled = true;
+    fetch(homeActionUrls[action], { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (typeof showToast === 'function') showToast(data.message || 'Started', data.status === 'busy' ? 'warning' : 'success');
+            if (data.status === 'busy' && btn) btn.disabled = false;
+            else if (data.status !== 'busy') homeStartPolling(2000);
+        })
+        .catch(function() {
+            if (typeof showToast === 'function') showToast('Request failed', 'error');
+            if (btn) btn.disabled = false;
+        });
+}
+function homeStartPolling(interval) {
+    if (homePollInterval) clearInterval(homePollInterval);
+    homePollInterval = setInterval(homePollPipelineStatus, interval || 5000);
+    homePollPipelineStatus();
+}
+function homePollPipelineStatus() {
+    fetch('/api/pipeline/status/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var ind = document.getElementById('home-pipeline-indicator');
+            var txt = document.getElementById('home-pipeline-status-text');
+            if (data.scraping || data.extracting) {
+                if (ind) ind.className = 'pipeline-status running';
+                if (txt) txt.textContent = (data.scraping ? 'Scraping' : '') + (data.extracting ? ' Extracting' : '') + '...';
+                ['home-btn-scrape','home-btn-extract','home-btn-full','home-btn-regeocode_all'].forEach(function(id) {
+                    var b = document.getElementById(id);
+                    if (b) b.disabled = true;
+                });
+            } else {
+                if (ind) ind.className = 'pipeline-status idle';
+                if (txt) txt.textContent = 'Idle';
+                ['home-btn-scrape','home-btn-extract','home-btn-full','home-btn-regeocode_all'].forEach(function(id) {
+                    var b = document.getElementById(id);
+                    if (b) b.disabled = false;
+                });
+            }
+            if (data.log && data.log.length > 0) {
+                var emptyEl = document.getElementById('home-log-empty');
+                var countEl = document.getElementById('home-log-count');
+                var entriesEl = document.getElementById('home-log-entries');
+                if (emptyEl) emptyEl.style.display = 'none';
+                if (countEl) countEl.textContent = data.log.length + ' entries';
+                if (entriesEl && typeof escapeHtml === 'function') {
+                    var newHtml = data.log.map(function(l) {
+                        var msg = escapeHtml(l.message);
+                        var sep = msg.indexOf('━') >= 0 || msg.indexOf('━━━') >= 0;
+                        var cls = sep ? 'log-entry log-separator' : 'log-entry log-' + (l.level || 'info');
+                        return '<div class="' + cls + '"><span class="log-time">' + escapeHtml(l.time) + '</span><span class="log-msg">' + msg + '</span></div>';
+                    }).join('');
+                    if (entriesEl.innerHTML !== newHtml) entriesEl.innerHTML = newHtml;
+                }
+            }
+        })
+        .catch(function() {});
+}
+if (document.getElementById('home-activity-log')) {
+    homeStartPolling(5000);
+}
+</script>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+{% endblock %}

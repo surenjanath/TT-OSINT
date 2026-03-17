@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div style="max-width: 1000px; margin: 0 auto; padding: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+        <div>
+            <h1 style="margin: 0; font-size: 24px; color: var(--text-primary);">Stories</h1>
+            <p style="margin: 4px 0 0; color: var(--text-secondary); font-size: 14px;">Article clusters covering the same event across sources and days.</p>
+        </div>
+    </div>
+
+    <form method="get" class="card" style="margin-bottom: 20px; padding: 16px;">
+        <label style="display: inline-flex; align-items: center; gap: 8px; font-size: 14px;">
+            <input type="checkbox" name="multi" value="1" {% if filters.multi == '1' %}checked{% endif %} onchange="this.form.submit()">
+            Only show stories with 2+ articles
+        </label>
+    </form>
+
+    <div class="stat-summary-bar" style="margin-bottom: 20px;">
+        <span class="stat-summary-total"><strong>{{ total_count }}</strong> stor{{ total_count|pluralize:"y,ies" }}</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 16px;">
+        {% for story in page_obj %}
+        <a href="{% url 'story_detail' story.pk %}" class="card" style="text-decoration: none; color: inherit; display: block; padding: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;">
+                <div style="flex: 1; min-width: 0;">
+                    <h3 style="margin: 0 0 8px 0; font-size: 18px; line-height: 1.35; color: var(--text-primary);">{{ story.title|truncatewords:20 }}</h3>
+                    {% if story.summary %}
+                    <p style="margin: 0; font-size: 14px; color: var(--text-secondary); line-height: 1.5;">{{ story.summary|truncatewords:25 }}</p>
+                    {% endif %}
+                    <div style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+                        <span class="badge badge-category" style="font-size: 11px;">{{ story.article_count }} article{{ story.article_count|pluralize }}</span>
+                        {% for art in story.articles.all %}
+                        {% if forloop.counter <= 4 %}
+                        <span style="font-size: 12px; color: var(--text-muted);">{{ art.source.name }}{% if forloop.counter < 4 and not forloop.last %}, {% endif %}</span>
+                        {% elif forloop.counter == 5 and story.article_count > 4 %}
+                        <span style="font-size: 12px; color: var(--text-muted);">+{{ story.article_count|add:"-4" }} more</span>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                <span style="font-size: 13px; color: var(--text-muted); white-space: nowrap;">View →</span>
+            </div>
+        </a>
+        {% empty %}
+        <div class="card" style="padding: 40px; text-align: center;">
+            <p style="margin: 0; color: var(--text-secondary);">No stories yet. Run the AI extraction pipeline and then <code>python manage.py cluster_stories</code> to group articles.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if page_obj.has_other_pages %}
+    <div style="display: flex; justify-content: center; gap: 8px; margin-top: 24px;">
+        {% if page_obj.has_previous %}
+        <a href="?page={{ page_obj.previous_page_number }}{% if filters.multi %}&multi={{ filters.multi }}{% endif %}" class="btn btn-sm">← Prev</a>
+        {% endif %}
+        <span style="align-self: center; font-size: 13px; color: var(--text-muted);">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?page={{ page_obj.next_page_number }}{% if filters.multi %}&multi={{ filters.multi }}{% endif %}" class="btn btn-sm">Next →</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,521 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="content">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+        <h1 class="page-title">{{ page_title }}</h1>
+        <a href="{% url 'operations' %}" class="btn btn-sm" style="text-decoration: none; color: inherit;">← Back to Operations Center</a>
+    </div>
+
+    <!-- Edit Source Card -->
+    <div class="card" style="margin-top: 16px;">
+        <div class="card-header">
+            <h3>Edit Config: {{ source.name }}</h3>
+        </div>
+        <div class="card-body">
+            <div id="add-source-form">
+                <div class="source-form-grid">
+                    <div class="filter-group">
+                        <label>Name</label>
+                        <input type="text" id="edit-source-name" class="filter-input" value="{{ source.name }}">
+                    </div>
+                    <div class="filter-group">
+                        <label>Base URL</label>
+                        <input type="url" id="edit-source-url" class="filter-input" value="{{ source.url }}">
+                    </div>
+                    <div class="filter-group">
+                        <label>RSS / API Search Endpoint URL</label>
+                        <input type="url" id="edit-source-rss" class="filter-input" value="{{ source.rss_url|default:'' }}">
+                    </div>
+                    <div class="filter-group">
+                        <label>Type</label>
+                        <select id="edit-source-type" class="filter-select" onchange="toggleApiFields()">
+                            <option value="rss" {% if source.scraper_type == 'rss' %}selected{% endif %}>RSS Feed</option>
+                            <option value="web" {% if source.scraper_type == 'web' %}selected{% endif %}>Web Scraper</option>
+                            <option value="api" {% if source.scraper_type == 'api' %}selected{% endif %}>JSON API</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- JSON API specific fields -->
+                <div id="api-config-fields" style="{% if source.scraper_type != 'api' %}display:none;{% endif %} margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h4 style="margin: 0; font-size: 13px; color: var(--text-primary);">API Configuration</h4>
+                        <button class="btn btn-sm" id="btn-fetch-sample" style="background-color: var(--primary-bg); color: var(--primary-text);" onclick="fetchSample()">📥 Fetch Sample Data</button>
+                    </div>
+                    
+                    <div class="source-form-grid">
+                        <div class="filter-group" style="grid-column: span 2;">
+                            <label>API Headers (JSON format)</label>
+                            <textarea id="edit-source-headers" class="filter-input" style="height: 60px; font-family: monospace; font-size: 12px; resize: vertical;"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Visual Field Mapper -->
+                    <div id="visual-mapper-container" style="background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 6px; padding: 16px; margin-top: 16px;">
+                        <h5 style="margin: 0 0 12px 0; font-size: 12px; color: var(--text-secondary);">Visual Field Mapping</h5>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                            <div class="filter-group" style="grid-column: span 2;">
+                                <label>Items Array Path</label>
+                                <input type="text" id="map-target-path" class="filter-input" placeholder="e.g. data.rows">
+                            </div>
+                            <div class="filter-group">
+                                <label>Title Field <span style="color:red">*</span></label>
+                                <select id="map-title" class="filter-select api-key-select"><option value="">-- Fetch sample first --</option></select>
+                            </div>
+                            <div class="filter-group">
+                                <label>URL Field <span style="color:red">*</span></label>
+                                <select id="map-url" class="filter-select api-key-select"><option value="">-- Fetch sample first --</option></select>
+                            </div>
+                            <div class="filter-group">
+                                <label>Publish Date Field</label>
+                                <select id="map-date" class="filter-select api-key-select"><option value="">-- Select field --</option></select>
+                            </div>
+                            <div class="filter-group">
+                                <label>Author Field</label>
+                                <select id="map-author" class="filter-select api-key-select"><option value="">-- Select field --</option></select>
+                            </div>
+                            <div class="filter-group" style="grid-column: span 2;">
+                                <label>Content/Summary Field</label>
+                                <select id="map-content" class="filter-select api-key-select"><option value="">-- Select field --</option></select>
+                            </div>
+                        </div>
+                        <input type="hidden" id="edit-source-mapping">
+                        <!-- API Pagination -->
+                        <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 6px; border: 1px solid var(--border-color);">
+                            <h5 style="margin: 0 0 10px 0; font-size: 12px; color: var(--text-secondary);">Pagination</h5>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">
+                                <input type="checkbox" id="api-pagination-enabled" style="width: auto;" {% if api_pagination.enabled %}checked{% endif %}>
+                                <label for="api-pagination-enabled" style="margin: 0;">Enable pagination</label>
+                            </div>
+                            <div class="source-form-grid">
+                                <div class="filter-group">
+                                    <label>Type</label>
+                                    <select id="api-pagination-type" class="filter-select">
+                                        <option value="offset" {% if api_pagination.type == 'offset' or not api_pagination.type %}selected{% endif %}>Offset</option>
+                                        <option value="page" {% if api_pagination.type == 'page' %}selected{% endif %}>Page number</option>
+                                        <option value="cursor" {% if api_pagination.type == 'cursor' %}selected{% endif %}>Cursor / Next URL</option>
+                                    </select>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Param name</label>
+                                    <input type="text" id="api-pagination-param" class="filter-input" value="{{ api_pagination.param|default:'o' }}">
+                                </div>
+                                <div class="filter-group">
+                                    <label>Page size</label>
+                                    <input type="number" id="api-pagination-page-size" class="filter-input" value="{{ api_pagination.page_size|default:100 }}" min="1">
+                                </div>
+                                <div class="filter-group">
+                                    <label>Max pages (0 = unlimited)</label>
+                                    <input type="number" id="api-pagination-max-pages" class="filter-input" value="{% if api_pagination.max_pages is not None %}{{ api_pagination.max_pages }}{% else %}1{% endif %}" min="0">
+                                </div>
+                                <div class="filter-group">
+                                    <label>Start offset (0 = first page)</label>
+                                    <input type="number" id="api-pagination-initial-offset" class="filter-input" value="{{ api_pagination.initial_offset|default:0 }}" min="0">
+                                </div>
+                                <div class="filter-group">
+                                    <label>Start page (page type only)</label>
+                                    <input type="number" id="api-pagination-initial-page" class="filter-input" value="{{ api_pagination.initial_page|default:1 }}" min="1">
+                                </div>
+                                <div class="filter-group">
+                                    <label>Next URL field (cursor)</label>
+                                    <input type="text" id="api-pagination-next-field" class="filter-input" value="{{ api_pagination.next_field|default:'next' }}">
+                                </div>
+                            </div>
+
+                        <!-- API Date Range -->
+                        <div style="margin-top: 16px; padding: 12px; background: var(--bg-secondary); border-radius: 6px; border: 1px solid var(--border-color);">
+                            <h5 style="margin: 0 0 10px 0; font-size: 12px; color: var(--text-secondary);">📅 Date Range (optional)</h5>
+                            <p style="font-size: 11px; color: var(--text-muted); margin: 0 0 12px 0;">Param names the API uses (e.g. d1, d2). Set default dates to scrape a specific range (e.g. 2024-01-01 to 2024-12-31).</p>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px;">
+                                <div class="filter-group">
+                                    <label>Start date param name</label>
+                                    <input type="text" id="api-date-range-start" class="filter-input" placeholder="e.g. d1" value="{{ api_date_range.start_param|default:'' }}">
+                                </div>
+                                <div class="filter-group">
+                                    <label>End date param name</label>
+                                    <input type="text" id="api-date-range-end" class="filter-input" placeholder="e.g. d2" value="{{ api_date_range.end_param|default:'' }}">
+                                </div>
+                                <div class="filter-group" style="grid-column: span 2;">
+                                    <label>Date format</label>
+                                    <input type="text" id="api-date-range-format" class="filter-input" placeholder="%Y-%m-%d" value="{{ api_date_range.format|default:'%Y-%m-%d' }}" style="max-width: 200px;">
+                                </div>
+                                <div class="filter-group">
+                                    <label>Default start date (optional)</label>
+                                    <input type="date" id="api-date-range-default-start" class="filter-input" value="{{ api_date_range.default_start|default:'' }}">
+                                    <small style="color: var(--text-muted); font-size: 10px;">e.g. 2024-01-01</small>
+                                </div>
+                                <div class="filter-group">
+                                    <label>Default end date (optional)</label>
+                                    <input type="date" id="api-date-range-default-end" class="filter-input" value="{{ api_date_range.default_end|default:'' }}">
+                                    <small style="color: var(--text-muted); font-size: 10px;">e.g. 2024-12-31; blank = today</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Advanced Settings Section -->
+                <div style="margin-top: 24px; padding-top: 16px; border-top: 1px dashed var(--border-color);">
+                    <h4 style="margin: 0 0 12px 0; font-size: 13px; color: var(--text-primary);">Advanced Settings</h4>
+                    <div class="source-form-grid">
+                        <div class="filter-group">
+                            <label>Max Articles Per Scrape (Optional)</label>
+                            <input type="number" id="edit-source-limit" class="filter-input" placeholder="e.g. 50" value="{{ source.max_articles_per_scrape|default_if_none:'' }}">
+                            <small style="color: var(--text-muted); font-size: 11px;">Leave blank to use global defaults.</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="display:flex;gap:8px;padding:16px 16px 16px 0;">
+                    <button class="btn btn-primary btn-sm" id="btn-save-source" onclick="saveSource()">💾 Update Source</button>
+                    <button class="btn btn-sm" id="btn-test-source" style="background-color: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-text);" onclick="testSource()">🧪 Test Configuration</button>
+                    <a href="{% url 'operations' %}" class="btn btn-sm" style="text-decoration: none; color: inherit;">Cancel</a>
+                </div>
+                
+                <!-- Test Results Area -->
+                <div id="test-results-container" style="display: none; margin-top: 24px; padding: 16px; border-radius: 6px; background-color: var(--bg-secondary); border: 1px solid var(--border-color);">
+                    <h4 style="margin: 0 0 12px 0; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+                        Test Results <span id="test-results-badge" class="severity-badge severity-info"></span>
+                    </h4>
+                    <div id="test-results-content" style="max-height: 400px; overflow-y: auto; font-size: 12px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Format JSON safely into block
+    document.addEventListener("DOMContentLoaded", function() {
+        const headersRaw = '{{ source.api_headers|escapejs|default:"" }}';
+        const mappingRaw = '{{ source.api_mapping|escapejs|default:"" }}';
+        
+        document.getElementById('edit-source-headers').value = processJsonInput(headersRaw);
+        document.getElementById('edit-source-mapping').value = processJsonInput(mappingRaw);
+        
+        // Try to prepopulate visuals
+        try {
+            if (mappingRaw && mappingRaw !== 'None') {
+                const mapObj = JSON.parse(mappingRaw.replace(/'/g, '"').replace(/True/g, 'true').replace(/False/g, 'false').replace(/None/g, 'null'));
+                document.getElementById('map-target-path').value = mapObj.items_path || '';
+                
+                // We create fake options just to show what was previously selected
+                const selects = ['map-title', 'map-url', 'map-date', 'map-author', 'map-content'];
+                const keys = ['title_field', 'url_field', 'date_field', 'author_field', 'content_field'];
+                for(let i=0; i<selects.length; i++) {
+                    const sel = document.getElementById(selects[i]);
+                    const mappedVal = mapObj[keys[i]];
+                    if(mappedVal) {
+                        sel.innerHTML = `<option value="${mappedVal}" selected>${mappedVal} (Saved)</option>`;
+                    }
+                }
+            }
+        } catch(e) {}
+    });
+
+    function processJsonInput(str) {
+        if (!str || str === 'None' || str === 'null') return '';
+        try {
+            let validJsonStr = str.replace(/'/g, '"');
+            validJsonStr = validJsonStr.replace(/True/g, 'true').replace(/False/g, 'false').replace(/None/g, 'null');
+            return JSON.stringify(JSON.parse(validJsonStr), null, 2);
+        } catch(e) {
+            return str;
+        }
+    }
+
+    function toggleApiFields() {
+        const type = document.getElementById('edit-source-type').value;
+        const apiFields = document.getElementById('api-config-fields');
+        apiFields.style.display = (type === 'api') ? 'block' : 'none';
+    }
+
+    function saveSource() {
+        const sourceId = {{ source.pk }};
+        const urlEndpoint = `/api/sources/${sourceId}/edit/`;
+
+        const btn = document.getElementById('btn-save-source');
+        btn.disabled = true;
+        btn.textContent = 'Saving...';
+
+        const data = {
+            name: document.getElementById('edit-source-name').value,
+            url: document.getElementById('edit-source-url').value,
+            rss_url: document.getElementById('edit-source-rss').value,
+            scraper_type: document.getElementById('edit-source-type').value,
+            max_articles_per_scrape: document.getElementById('edit-source-limit').value || null
+        };
+        
+        if (data.scraper_type === 'api') {
+            const headersRaw = document.getElementById('edit-source-headers').value;
+            
+            // Build mapping from visuals
+            const mappingData = {
+                items_path: document.getElementById('map-target-path').value,
+                title_field: document.getElementById('map-title').value,
+                url_field: document.getElementById('map-url').value,
+                date_field: document.getElementById('map-date').value,
+                author_field: document.getElementById('map-author').value,
+                content_field: document.getElementById('map-content').value
+            };
+            
+            document.getElementById('edit-source-mapping').value = JSON.stringify(mappingData);
+            
+            const paginationEnabled = document.getElementById('api-pagination-enabled').checked;
+            data.api_pagination = paginationEnabled ? {
+                enabled: true,
+                type: document.getElementById('api-pagination-type').value,
+                param: document.getElementById('api-pagination-param').value || 'o',
+                page_size: parseInt(document.getElementById('api-pagination-page-size').value, 10) || 100,
+                max_pages: parseInt(document.getElementById('api-pagination-max-pages').value, 10),
+                initial_offset: parseInt(document.getElementById('api-pagination-initial-offset').value, 10) || 0,
+                initial_page: parseInt(document.getElementById('api-pagination-initial-page').value, 10) || 1,
+                next_field: document.getElementById('api-pagination-next-field').value || 'next'
+            } : null;
+
+            var drStart = document.getElementById('api-date-range-start').value.trim();
+            var drEnd = document.getElementById('api-date-range-end').value.trim();
+            if (drStart && drEnd) {
+                var drDefaultStart = document.getElementById('api-date-range-default-start').value.trim();
+                var drDefaultEnd = document.getElementById('api-date-range-default-end').value.trim();
+                data.api_date_range = {
+                    start_param: drStart,
+                    end_param: drEnd,
+                    format: document.getElementById('api-date-range-format').value.trim() || '%Y-%m-%d'
+                };
+                if (drDefaultStart) data.api_date_range.default_start = drDefaultStart;
+                if (drDefaultEnd) data.api_date_range.default_end = drDefaultEnd;
+            } else {
+                data.api_date_range = null;
+            }
+
+            try {
+                data.api_headers = headersRaw ? JSON.parse(headersRaw) : null;
+                data.api_mapping = mappingData;
+            } catch(e) {
+                showToast('Invalid JSON in API configuration fields', 'error');
+                btn.disabled = false;
+                btn.textContent = '💾 Update Source';
+                return;
+            }
+        }
+        
+        if (!data.name || !data.url) {
+            showToast('Name and URL are required', 'error');
+            btn.disabled = false;
+            btn.textContent = '💾 Update Source';
+            return;
+        }
+
+        fetch(urlEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(data),
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.status === 'ok' || result.success) {
+                window.location.href = "{% url 'operations' %}";
+            } else {
+                showToast('Error saving source: ' + (result.error || 'Unknown error'), 'error');
+                btn.disabled = false;
+                btn.textContent = '💾 Update Source';
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            showToast('Request failed', 'error');
+            btn.disabled = false;
+            btn.textContent = '💾 Update Source';
+        });
+    }
+    
+    function fetchSample() {
+        const btn = document.getElementById('btn-fetch-sample');
+        
+        const data = {
+            url: document.getElementById('edit-source-url').value,
+            rss_url: document.getElementById('edit-source-rss').value,
+            scraper_type: document.getElementById('edit-source-type').value,
+        };
+        
+        if (!data.url && !data.rss_url) return showToast('URL is required', 'error');
+        
+        const headersRaw = document.getElementById('edit-source-headers').value;
+        try { data.api_headers = headersRaw ? JSON.parse(headersRaw) : null; } catch(e) {}
+        
+        btn.disabled = true;
+        btn.textContent = 'Fetching...';
+        
+        fetch('/api/sources/fetch-sample/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(data),
+        })
+        .then(r => r.json())
+        .then(res => {
+            btn.disabled = false;
+            btn.textContent = '📥 Fetch Sample Data';
+            
+            if (res.success) {
+                document.getElementById('map-target-path').value = res.items_path;
+                
+                let optionsHtml = '<option value="">-- Leave empty to ignore --</option>';
+                res.keys.forEach(k => {
+                    const sampleStr = res.sample_item[k] ? ` (Sample: "${res.sample_item[k]}")` : '';
+                    optionsHtml += `<option value="${k}">${k}${sampleStr}</option>`;
+                });
+                
+                document.querySelectorAll('.api-key-select').forEach(sel => {
+                    const currentVal = sel.value;
+                    sel.innerHTML = optionsHtml;
+                    if (currentVal && res.keys.includes(currentVal)) {
+                        sel.value = currentVal; // Restore selection if it exists
+                    }
+                });
+                showToast('Sample fetched successfully! Map your fields.', 'success');
+            } else {
+                showToast('Error: ' + res.error, 'error');
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btn.textContent = '📥 Fetch Sample Data';
+            showToast('Network error fetching sample', 'error');
+        });
+    }
+
+    function testSource() {
+        const btn = document.getElementById('btn-test-source');
+        const container = document.getElementById('test-results-container');
+        const contentBox = document.getElementById('test-results-content');
+        const badge = document.getElementById('test-results-badge');
+        
+        btn.disabled = true;
+        btn.textContent = '🧪 Testing...';
+        
+        const data = {
+            url: document.getElementById('edit-source-url').value,
+            rss_url: document.getElementById('edit-source-rss').value,
+            scraper_type: document.getElementById('edit-source-type').value,
+        };
+        
+        if (data.scraper_type === 'api') {
+            const headersRaw = document.getElementById('edit-source-headers').value;
+            
+            // Re-build mapping raw json from UI just for the test
+            const mappingData = {
+                items_path: document.getElementById('map-target-path').value,
+                title_field: document.getElementById('map-title').value,
+                url_field: document.getElementById('map-url').value,
+                date_field: document.getElementById('map-date').value,
+                author_field: document.getElementById('map-author').value,
+                content_field: document.getElementById('map-content').value
+            };
+            
+            try {
+                data.api_headers = headersRaw ? JSON.parse(headersRaw) : null;
+                data.api_mapping = mappingData;
+            } catch(e) {
+                showToast('Invalid JSON in API configuration fields', 'error');
+                btn.disabled = false;
+                btn.textContent = '🧪 Test Configuration';
+                return;
+            }
+        }
+        
+        if (!data.url) {
+            showToast('Base URL is required to test', 'error');
+            btn.disabled = false;
+            btn.textContent = '🧪 Test Configuration';
+            return;
+        }
+
+        contentBox.innerHTML = '<p style="color: var(--text-muted);">Running scraper... this may take a few moments...</p>';
+        container.style.display = 'block';
+        badge.textContent = 'Running';
+        badge.className = 'severity-badge severity-info';
+
+        fetch('/api/sources/test/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify(data),
+        })
+        .then(response => response.json())
+        .then(result => {
+            btn.disabled = false;
+            btn.textContent = '🧪 Test Configuration';
+            
+            if (result.success) {
+                badge.textContent = `${result.total_found} Found`;
+                badge.className = result.total_found > 0 ? 'severity-badge severity-medium' : 'severity-badge severity-critical';
+                
+                if (result.articles && result.articles.length > 0) {
+                    let html = `<p style="margin-bottom:12px;color:var(--text-muted);">Previewing first 3 articles:</p>`;
+                    result.articles.forEach((a, i) => {
+                        html += `
+                        <div style="background-color: var(--bg-primary); padding: 12px; margin-bottom: 8px; border-radius: 4px; border: 1px solid var(--border-color);">
+                            <h5 style="margin: 0 0 8px 0; color: var(--accent-color);">${i+1}. ${a.title}</h5>
+                            <div style="margin-bottom: 8px;">
+                                <a href="${a.url}" target="_blank" style="color: var(--text-secondary); text-decoration: underline;">${a.url}</a>
+                            </div>
+                            <div style="display: flex; gap: 16px; margin-bottom: 8px; color: var(--text-muted);">
+                                <span><strong>Date:</strong> ${a.published_date}</span>
+                                <span><strong>Author:</strong> ${a.author || '-'}</span>
+                            </div>
+                            <div style="color: var(--text-secondary); font-style: italic; background: rgba(0,0,0,0.1); padding: 8px; border-radius: 4px;">
+                                ${a.content_preview || 'No content parsed.'}
+                            </div>
+                        </div>`;
+                    });
+                    contentBox.innerHTML = html;
+                } else {
+                    contentBox.innerHTML = '<p style="color: var(--text-muted);">No articles found. Check your mapping and endpoints.</p>';
+                }
+            } else {
+                badge.textContent = 'Failed';
+                badge.className = 'severity-badge severity-critical';
+                contentBox.innerHTML = `<p style="color: var(--danger-color);">${result.error}</p>`;
+                if (result.details) {
+                    contentBox.innerHTML += `<pre style="margin-top:8px; padding:8px; background:#111; color:#fff; border-radius:4px; max-height:200px; overflow:auto;">${result.details}</pre>`;
+                }
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            btn.disabled = false;
+            btn.textContent = '🧪 Test Configuration';
+            badge.textContent = 'Error';
+            badge.className = 'severity-badge severity-critical';
+            contentBox.innerHTML = '<p style="color: var(--danger-color);">Network request failed.</p>';
+        });
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}
