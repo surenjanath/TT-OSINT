@@ -236,7 +236,7 @@ Static files are served via **WhiteNoise** (no separate static server needed for
 
 ### 5. Deploy on DigitalOcean (App Platform)
 
-The repo includes a [DigitalOcean App Platform](https://docs.digitalocean.com/products/app-platform/) spec for a **demo deploy using SQLite** (no PostgreSQL). Simpler and cheaper; good for showing the app.
+The repo includes a [DigitalOcean App Platform](https://docs.digitalocean.com/products/app-platform/) spec that uses **PostgreSQL** so data persists across deploys.
 
 **Steps:**
 
@@ -244,8 +244,8 @@ The repo includes a [DigitalOcean App Platform](https://docs.digitalocean.com/pr
 
 2. **Create an App** in [DigitalOcean](https://cloud.digitalocean.com/apps):
    - **Create App** → **GitHub** → select your `TT_OSINT` repo and branch (e.g. `main`).
-   - Use the included spec: choose **Use existing app spec** and select `.do/app.yaml` (edit `github.repo` in that file to match your `owner/repo`).
-   - Or create manually: **Build Command** `python manage.py collectstatic --noinput`, **Run Command** `python manage.py migrate --noinput && gunicorn tt_osint.wsgi:application --bind 0.0.0.0:$PORT --worker-tmp-dir /dev/shm --workers 2`, **HTTP Port** `8080`. Do not add a database component if you want SQLite.
+   - Use the included spec: choose **Use existing app spec** and select `.do/app.yaml` (edit `github.repo` in that file to match your `owner/repo`). The spec adds a PostgreSQL 16 database and sets `DATABASE_URL` for the app.
+   - Or create manually: add a **Database** (PostgreSQL 16), set **Build Command** `python manage.py collectstatic --noinput`, **Run Command** `python manage.py migrate --noinput && gunicorn tt_osint.wsgi:application --bind 0.0.0.0:$PORT --worker-tmp-dir /dev/shm --workers 2`, **HTTP Port** `8080`, and bind the database so the app gets `DATABASE_URL`.
 
 3. **Set environment variables** (Settings → Environment Variables):
    - **Required:** `DJANGO_SECRET_KEY` (long random string), `ALLOWED_HOSTS` (your app hostname, e.g. `your-app-xxxxx.ondigitalocean.app` — no `https://`).
@@ -254,7 +254,7 @@ The repo includes a [DigitalOcean App Platform](https://docs.digitalocean.com/pr
 
 4. **Deploy.** Open your app URL after the first deploy. Use **Console** to run `python manage.py createsuperuser` if you need Django admin.
 
-**SQLite (demo):** With the default spec, the app uses SQLite. Data is stored on the app’s filesystem and **may be reset on redeploy or restart**. For a persistent demo or production, add a PostgreSQL database in the DO UI and set `DATABASE_URL` (or use the `POSTGRES_*` env vars) so Django uses Postgres instead.
+**If you already have an app (no DB):** In the DO dashboard, add a **Database** (PostgreSQL) to the app, then in the web service’s environment variables add `DATABASE_URL` and set it to the database’s connection string (or use the “Bind to database” option so DO injects it). Redeploy so the app uses Postgres instead of SQLite.
 
 **Using doctl:** Edit `.do/app.yaml` and set `github.repo` to your repo (e.g. `your-username/TT_OSINT`). Then: `doctl apps create --spec .do/app.yaml`. Add `DJANGO_SECRET_KEY` and `ALLOWED_HOSTS` in the Control Panel.
 

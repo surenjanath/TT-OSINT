@@ -1,17 +1,20 @@
-# DigitalOcean App Platform spec for TT_OSINT (demo: SQLite, no PostgreSQL).
-# 1. Push this repo to GitHub, then in DO: Create App → GitHub → select repo.
-# 2. Or deploy with doctl: doctl apps create --spec .do/app.yaml
-# 3. Set DJANGO_SECRET_KEY and ALLOWED_HOSTS in the App Platform UI (Settings → Environment Variables).
-# 4. Replace github.repo below with your owner/repo if using doctl or API.
+# DigitalOcean App Platform spec for TT_OSINT with PostgreSQL.
+# 1. Push this repo to GitHub, then in DO: Create App → GitHub → select repo (or use existing app spec).
+# 2. Set DJANGO_SECRET_KEY and ALLOWED_HOSTS in the App Platform UI (Settings → Environment Variables).
+# 3. Replace github.repo below with your owner/repo if using doctl or API.
 #
-# Note: SQLite is used (no DATABASE_URL). Data is stored in the app's filesystem and
-# may be reset on redeploy/restart. For persistent data, add a PostgreSQL database.
+# PostgreSQL is included; DATABASE_URL is set automatically. Data persists across deploys.
 
 name: tt-osint
 region: nyc
 
 features:
   - buildpack-stack=ubuntu-22
+
+databases:
+  - name: db
+    engine: PG
+    version: "16"
 
 services:
   - name: web
@@ -26,6 +29,10 @@ services:
     instance_count: 1
     instance_size_slug: basic-xxs
     envs:
+      - key: DATABASE_URL
+        value: ${db.DATABASE_URL}
+        scope: RUN_AND_BUILD_TIME
+        type: GENERAL
       - key: DJANGO_DEBUG
         value: "false"
         scope: RUN_TIME
