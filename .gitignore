@@ -4,7 +4,7 @@
 .env.*.local
 
 # Database
-*.sqlite3
+
 db_original.sqlite3
 
 # Static (collected in production)
