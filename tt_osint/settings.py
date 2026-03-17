@@ -85,17 +85,37 @@ elif os.environ.get("POSTGRES_DB"):
     }
 else:
     # SQLite: explicit path, or data/db.sqlite3 (pushed to git), or writable dir, or cloud /tmp, else project root.
-    # On cloud (Heroku, DigitalOcean), copy bundled DB to /tmp so it's writable and avoids "file is not a database".
+    # On cloud, use /tmp so the DB is writable; copy bundled DB if present, else use/create /tmp/db.sqlite3.
     _bundled_db = BASE_DIR / "data" / "db.sqlite3"
     _on_cloud = bool(os.environ.get("PORT") or os.environ.get("DYNO") or os.environ.get("HEROKU_APP_NAME"))
+    _tmp_db = os.path.join(os.environ.get("TMPDIR", "/tmp"), "db.sqlite3")
+
+    def _is_valid_sqlite(path: str) -> bool:
+        if not path or not os.path.isfile(path):
+            return False
+        try:
+            import sqlite3
+            with sqlite3.connect(path) as conn:
+                conn.execute("SELECT 1")
+            return True
+        except Exception:
+            return False
+
+    def _ensure_writable_sqlite(path: str) -> None:
+        if os.path.isfile(path) and not _is_valid_sqlite(path):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+
     _sqlite_path_env = os.environ.get("SQLITE_DB_PATH")
     if _sqlite_path_env:
         _sqlite_path = _sqlite_path_env
     elif _bundled_db.exists():
         if _on_cloud:
             import shutil
-            _tmp_db = os.path.join(os.environ.get("TMPDIR", "/tmp"), "db.sqlite3")
             shutil.copy2(str(_bundled_db), _tmp_db)
+            _ensure_writable_sqlite(_tmp_db)
             _sqlite_path = _tmp_db
         else:
             _sqlite_path = str(_bundled_db)
@@ -104,7 +124,8 @@ else:
         if _sqlite_dir:
             _sqlite_path = os.path.join(_sqlite_dir, "db.sqlite3")
         elif _on_cloud:
-            _sqlite_path = os.path.join(os.environ.get("TMPDIR", "/tmp"), "db.sqlite3")
+            _ensure_writable_sqlite(_tmp_db)
+            _sqlite_path = _tmp_db
         else:
             _sqlite_path = str(BASE_DIR / "db.sqlite3")
     DATABASES = {
