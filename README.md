@@ -36,6 +36,7 @@ An **AI-powered geospatial intelligence platform** that ingests news from Trinid
 TT_OSINT/
 ├── tt_osint/           # Django project settings & root URLs
 ├── core/                # Shared templates, static assets, SystemSetting model
+├── data/                # Optional: put db.sqlite3 here to deploy with the app (committed to git)
 ├── articles/            # News sources, Article/Story/ScrapeJob models, scraping & clustering
 │   └── management/commands/
 │       ├── scrape_news.py      # Scrape all or one source
@@ -183,6 +184,7 @@ Incidents can be **pending**, **approved**, or **rejected**; the map and exports
 - **AI extractor limit:** Configurable via **Settings** in the UI (stored in `core.SystemSetting`, key `ai_extractor_limit`). `process_articles` uses this unless overridden by `--limit`.
 - **Geocoding:** Uses Nominatim with a custom `User-Agent` (see `settings.NOMINATIM_USER_AGENT`). Rate-limiting and usage policies of the geocoding service apply.
 - **Time zone:** `America/Port_of_Spain` in Django settings.
+- **SQLite in repo (demo):** To use your own database on deploy, put it in **`data/db.sqlite3`** and commit it. The app will use `data/db.sqlite3` when present (e.g. on Heroku/App Platform). Locally, the root `db.sqlite3` is ignored by git; use `data/db.sqlite3` for the copy you push.
 
 ---
 

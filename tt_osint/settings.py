@@ -84,10 +84,25 @@ elif os.environ.get("POSTGRES_DB"):
         }
     }
 else:
+    # SQLite: explicit path, or data/db.sqlite3 (pushed to git for deploy), or writable dir, or Heroku /tmp, else project root.
+    _bundled_db = BASE_DIR / "data" / "db.sqlite3"
+    _sqlite_path_env = os.environ.get("SQLITE_DB_PATH")
+    if _sqlite_path_env:
+        _sqlite_path = _sqlite_path_env
+    elif _bundled_db.exists():
+        _sqlite_path = str(_bundled_db)
+    else:
+        _sqlite_dir = os.environ.get("SQLITE_DB_DIR")
+        if _sqlite_dir:
+            _sqlite_path = os.path.join(_sqlite_dir, "db.sqlite3")
+        elif os.environ.get("DYNO") or os.environ.get("HEROKU_APP_NAME"):
+            _sqlite_path = os.path.join(os.environ.get("TMPDIR", "/tmp"), "db.sqlite3")
+        else:
+            _sqlite_path = str(BASE_DIR / "db.sqlite3")
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
+            "NAME": _sqlite_path,
         }
     }
 

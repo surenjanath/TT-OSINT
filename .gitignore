@@ -3,8 +3,8 @@
 .env.local
 .env.*.local
 
-# Database
-
+# Database (root db.sqlite3 is local-only; we commit data/db.sqlite3 for deploy)
+/db.sqlite3
 db_original.sqlite3
 
 # Static (collected in production)
