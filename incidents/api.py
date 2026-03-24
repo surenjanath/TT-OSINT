@@ -4,6 +4,7 @@ JSON API endpoints — map data, pipeline operations, source management, moderat
 import json
 import threading
 import logging
+from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
@@ -91,7 +92,12 @@ def incidents_geojson(request):
         except ValueError:
             pass
 
-    features = [f for f in (inc.to_geojson_feature() for inc in incidents) if f]
+    incidents = incidents.select_related('primary_article__source')
+    features = []
+    for inc in incidents.iterator(chunk_size=300):
+        f = inc.to_geojson_feature()
+        if f:
+            features.append(f)
 
     return JsonResponse({'type': 'FeatureCollection', 'features': features})
 
@@ -455,6 +461,21 @@ def regeocode_all_incidents(request):
 @require_GET
 def pipeline_status(request):
     """Return current pipeline state with detailed metrics."""
+    art = Article.objects.aggregate(
+        articles_total=Count('id'),
+        articles_unprocessed=Count('id', filter=Q(is_processed=False)),
+        articles_processed=Count('id', filter=Q(is_processed=True)),
+    )
+    inc = Incident.objects.aggregate(
+        incidents_total=Count('id'),
+        incidents_pending=Count('id', filter=Q(status='pending')),
+        incidents_approved=Count('id', filter=Q(status='approved')),
+        incidents_rejected=Count('id', filter=Q(status='rejected')),
+    )
+    src = NewsSource.objects.aggregate(
+        sources_total=Count('id'),
+        sources_active=Count('id', filter=Q(is_active=True)),
+    )
     return JsonResponse({
         'scraping': _pipeline_state['scraping'],
         'extracting': _pipeline_state['extracting'],
@@ -468,15 +489,15 @@ def pipeline_status(request):
         'extract_start': _pipeline_state.get('extract_start', ''),
         'scrape_error': _pipeline_state['scrape_error'],
         'extract_error': _pipeline_state['extract_error'],
-        'articles_total': Article.objects.count(),
-        'articles_unprocessed': Article.objects.filter(is_processed=False).count(),
-        'articles_processed': Article.objects.filter(is_processed=True).count(),
-        'incidents_total': Incident.objects.count(),
-        'incidents_pending': Incident.objects.filter(status='pending').count(),
-        'incidents_approved': Incident.objects.filter(status='approved').count(),
-        'incidents_rejected': Incident.objects.filter(status='rejected').count(),
-        'sources_active': NewsSource.objects.filter(is_active=True).count(),
-        'sources_total': NewsSource.objects.count(),
+        'articles_total': art['articles_total'],
+        'articles_unprocessed': art['articles_unprocessed'],
+        'articles_processed': art['articles_processed'],
+        'incidents_total': inc['incidents_total'],
+        'incidents_pending': inc['incidents_pending'],
+        'incidents_approved': inc['incidents_approved'],
+        'incidents_rejected': inc['incidents_rejected'],
+        'sources_active': src['sources_active'],
+        'sources_total': src['sources_total'],
         'log': _pipeline_state['log'][:80],
     })
 
@@ -486,7 +507,9 @@ def pipeline_status(request):
 @require_GET
 def list_sources(request):
     """Return all news sources as JSON."""
-    sources = NewsSource.objects.all().order_by('name')
+    sources = NewsSource.objects.annotate(
+        _article_count=Count('articles')
+    ).order_by('name')
     data = []
     for s in sources:
         data.append({
@@ -501,7 +524,7 @@ def list_sources(request):
             'api_date_range': s.api_date_range,
             'is_active': s.is_active,
             'last_checked': s.last_checked.strftime('%Y-%m-%d %H:%M') if s.last_checked else 'Never',
-            'article_count': s.articles.count(),
+            'article_count': s._article_count,
         })
     return JsonResponse({'sources': data})
 

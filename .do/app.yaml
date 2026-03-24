@@ -20,7 +20,7 @@ services:
   - name: web
     environment_slug: python
     github:
-      repo: YOUR_GITHUB_OWNER/TT_OSINT
+      repo: surenjanath/TT_OSINT
       branch: main
       deploy_on_push: true
     build_command: python manage.py collectstatic --noinput
@@ -37,5 +37,11 @@ services:
         value: "false"
         scope: RUN_TIME
         type: GENERAL
+      # Use schema "app" when public is not writable (DigitalOcean managed PG). Run scripts/create_app_schema.sql as admin first.
+      - key: PG_SCHEMA
+        value: app
+        scope: RUN_TIME
+        type: GENERAL
       # Set in App Platform UI: DJANGO_SECRET_KEY, ALLOWED_HOSTS (e.g. your-app-xxxxx.ondigitalocean.app)
+      # Optional SEO: CANONICAL_SITE_URL=https://your-domain (no trailing slash) for robots/sitemap/canonical URLs
       # Optional: OLLAMA_HOST, OLLAMA_MODEL if you run Ollama elsewhere

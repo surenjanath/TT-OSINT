@@ -17,54 +17,67 @@ from articles.models import Article, NewsSource, Story
 
 def home_view(request):
     """National map dashboard — main landing page."""
-    incidents = Incident.objects.filter(
-        status__in=['approved', 'pending'],
-        latitude__isnull=False,
-        longitude__isnull=False,
-    )
-
-    # Stats for the sidebar
     now = timezone.now()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     yesterday_start = today_start - timedelta(days=1)
     week_ago = now - timedelta(days=7)
     two_weeks_ago = now - timedelta(days=14)
+    spark_start = (now - timedelta(days=6)).replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow_start = today_start + timedelta(days=1)
 
-    incidents_today = incidents.filter(incident_date__gte=today_start).count()
-    yesterday_count = incidents.filter(
-        incident_date__gte=yesterday_start,
-        incident_date__lt=today_start,
-    ).count()
-    incidents_week = incidents.filter(incident_date__gte=week_ago).count()
-    last_week_count = incidents.filter(
-        incident_date__gte=two_weeks_ago,
-        incident_date__lt=week_ago,
-    ).count()
+    mapped = Incident.objects.filter(
+        status__in=['approved', 'pending'],
+        latitude__isnull=False,
+        longitude__isnull=False,
+    )
 
-    # Week-over-week change (positive = up)
+    home_agg = mapped.aggregate(
+        incidents_today=Count('id', filter=Q(incident_date__gte=today_start)),
+        yesterday_count=Count(
+            'id',
+            filter=Q(incident_date__gte=yesterday_start, incident_date__lt=today_start),
+        ),
+        incidents_week=Count('id', filter=Q(incident_date__gte=week_ago)),
+        last_week_count=Count(
+            'id',
+            filter=Q(incident_date__gte=two_weeks_ago, incident_date__lt=week_ago),
+        ),
+        total_mapped=Count('id'),
+        critical_count=Count('id', filter=Q(severity='critical')),
+        high_count=Count('id', filter=Q(severity='high')),
+        total_victims=Sum('victim_count'),
+        total_fatalities=Sum('fatality_count'),
+    )
+
+    incidents_today = home_agg['incidents_today']
+    yesterday_count = home_agg['yesterday_count']
+    incidents_week = home_agg['incidents_week']
+    last_week_count = home_agg['last_week_count']
+    total_mapped = home_agg['total_mapped']
+    total_for_pct = total_mapped or 1
+
     if last_week_count:
-        week_over_week_change = round((incidents_week - last_week_count) / last_week_count * 100)
+        week_over_week_change = round(
+            (incidents_week - last_week_count) / last_week_count * 100
+        )
     else:
         week_over_week_change = 0 if incidents_week == 0 else 100
 
-    # Threat distribution: top 3–4 categories by count (with display names)
     cat_display = dict(Incident.CATEGORY_CHOICES)
-    by_cat = (
-        incidents.values('category')
-        .annotate(count=Count('id'))
-        .order_by('-count')[:4]
+    by_cat_all = list(
+        mapped.values('category').annotate(count=Count('id')).order_by('-count')
     )
-    total_for_pct = incidents.count() or 1
     threat_distribution = [
         {
-            'name': cat_display.get(c['category'], c['category'].replace('_', ' ').title()),
+            'name': cat_display.get(
+                c['category'], c['category'].replace('_', ' ').title()
+            ),
             'count': c['count'],
             'pct': round(c['count'] / total_for_pct * 100),
         }
-        for c in by_cat
+        for c in by_cat_all[:4]
     ]
 
-    # Source health: active sources with last_checked (time since)
     active_sources_qs = NewsSource.objects.filter(is_active=True).order_by('name')
     source_health = []
     for src in active_sources_qs:
@@ -76,17 +89,13 @@ def home_view(request):
                 since = f"{delta.seconds // 3600}h ago"
             else:
                 since = "Recently"
-            healthy = delta.days < 2  # considered healthy if checked in last 2 days
+            healthy = delta.days < 2
         else:
             since = "Never"
             healthy = False
         source_health.append({'name': src.name, 'since': since, 'healthy': healthy})
 
-    # Severity breakdown: all 4 levels with count and pct
-    sev_display = dict(Incident.SEVERITY_CHOICES)
-    by_sev = list(
-        incidents.values('severity').annotate(count=Count('id'))
-    )
+    by_sev = list(mapped.values('severity').annotate(count=Count('id')))
     sev_counts = {s['severity']: s['count'] for s in by_sev}
     severity_breakdown = []
     for sev_key, sev_label in Incident.SEVERITY_CHOICES:
@@ -99,10 +108,9 @@ def home_view(request):
             'pct': pct,
         })
 
-    # Region breakdown: top 5 regions by count
     region_display = dict(Incident.REGION_CHOICES)
     by_region_raw = list(
-        incidents.values('region').annotate(count=Count('id')).order_by('-count')[:5]
+        mapped.values('region').annotate(count=Count('id')).order_by('-count')[:5]
     )
     region_breakdown = [
         {'name': region_display.get(r['region'], r['region']), 'count': r['count']}
@@ -110,9 +118,8 @@ def home_view(request):
     ]
     region_max_count = by_region_raw[0]['count'] if by_region_raw else 1
 
-    # Top hotspots: top 5 locations by count with region display
     top_hotspots_raw = list(
-        incidents.filter(location_name__isnull=False)
+        mapped.filter(location_name__isnull=False)
         .exclude(location_name='')
         .values('location_name', 'region')
         .annotate(count=Count('id'))
@@ -123,49 +130,71 @@ def home_view(request):
         for h in top_hotspots_raw
     ]
 
-    # Category chart data for sidebar donut (labels + values)
-    by_cat_all = list(
-        incidents.values('category')
-        .annotate(count=Count('id'))
-        .order_by('-count')
-    )
     category_chart_data = {
-        'labels': [cat_display.get(c['category'], c['category'].replace('_', ' ').title()) for c in by_cat_all],
+        'labels': [
+            cat_display.get(c['category'], c['category'].replace('_', ' ').title())
+            for c in by_cat_all
+        ],
         'values': [c['count'] for c in by_cat_all],
     }
 
-    total_mapped = incidents.count()
+    total_victims = home_agg['total_victims'] or 0
+    total_fatalities = home_agg['total_fatalities'] or 0
 
-    # Enriched stats: total victims, fatalities
-    agg = incidents.aggregate(
-        total_victims=Sum('victim_count'),
-        total_fatalities=Sum('fatality_count'),
+    spark_rows = (
+        mapped.filter(
+            incident_date__gte=spark_start,
+            incident_date__lt=tomorrow_start,
+        )
+        .annotate(day=TruncDate('incident_date'))
+        .values('day')
+        .annotate(c=Count('id'))
     )
-    total_victims = agg['total_victims'] or 0
-    total_fatalities = agg['total_fatalities'] or 0
+    counts_by_day = {}
+    for row in spark_rows:
+        if row['day']:
+            counts_by_day[row['day'].strftime('%Y-%m-%d')] = row['c']
+    sparkline_data = []
+    for i in range(6, -1, -1):
+        day = (now - timedelta(days=i)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        sparkline_data.append(counts_by_day.get(day.strftime('%Y-%m-%d'), 0))
 
-    # JSON for home category donut (template-safe)
+    article_agg = Article.objects.aggregate(
+        articles_total=Count('id'),
+        articles_unprocessed=Count('id', filter=Q(is_processed=False)),
+    )
+    pending_agg = Incident.objects.aggregate(
+        incidents_pending=Count('id', filter=Q(status='pending')),
+    )
+
+    recent_incidents = (
+        mapped.select_related('primary_article')
+        .order_by('-incident_date')[:10]
+    )
+
     context_category_chart_labels = json.dumps(category_chart_data['labels'])
     context_category_chart_values = json.dumps(category_chart_data['values'])
 
     context = {
         'page_title': 'Intelligence Map',
-        'total_incidents': incidents.count(),
+        'total_incidents': total_mapped,
         'total_mapped': total_mapped,
         'incidents_today': incidents_today,
         'incidents_week': incidents_week,
         'yesterday_count': yesterday_count,
         'week_over_week_change': week_over_week_change,
-        'articles_unprocessed': Article.objects.filter(is_processed=False).count(),
-        'articles_total': Article.objects.count(),
-        'incidents_pending': Incident.objects.filter(status='pending').count(),
-        'critical_count': incidents.filter(severity='critical').count(),
-        'high_count': incidents.filter(severity='high').count(),
+        'articles_unprocessed': article_agg['articles_unprocessed'],
+        'articles_total': article_agg['articles_total'],
+        'incidents_pending': pending_agg['incidents_pending'],
+        'critical_count': home_agg['critical_count'],
+        'high_count': home_agg['high_count'],
         'total_victims': total_victims,
         'total_fatalities': total_fatalities,
         'categories': Incident.CATEGORY_CHOICES,
         'regions': Incident.REGION_CHOICES,
-        'recent_incidents': incidents.order_by('-incident_date')[:10],
+        'recent_incidents': recent_incidents,
         'active_sources': active_sources_qs,
         'threat_distribution': threat_distribution,
         'source_health': source_health,
@@ -177,25 +206,11 @@ def home_view(request):
         'category_chart_data': category_chart_data,
         'category_chart_data_labels': context_category_chart_labels,
         'category_chart_data_values': context_category_chart_values,
+        'sparkline_data': sparkline_data,
     }
 
-    # Generate 7-day sparkline data
-    sparkline_data = []
-    for i in range(7):
-        day = now - timedelta(days=i)
-        day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
-        day_end = day_start + timedelta(days=1)
-        count = incidents.filter(
-            incident_date__gte=day_start,
-            incident_date__lt=day_end,
-        ).count()
-        sparkline_data.append(count)
-    sparkline_data.reverse()
-    context['sparkline_data'] = sparkline_data
-
-    # Data freshness
-    last_article = Article.objects.order_by('-scraped_date').first()
-    last_incident = Incident.objects.order_by('-created_at').first()
+    last_article = Article.objects.order_by('-scraped_date').only('scraped_date').first()
+    last_incident = Incident.objects.order_by('-created_at').only('created_at').first()
     context['last_article_time'] = last_article.scraped_date if last_article else None
     context['last_incident_time'] = last_incident.created_at if last_incident else None
 
@@ -363,8 +378,8 @@ def analytics_view(request):
 
     # Source performance — 1 annotated query (articles + incidents per source)
     source_perf_qs = NewsSource.objects.filter(is_active=True).annotate(
-        art_count=Count('articles'),
-        inc_count=Count('articles__incidents'),
+        art_count=Count('articles', distinct=True),
+        inc_count=Count('articles__incidents', distinct=True),
     ).values('name', 'art_count', 'inc_count').order_by('-inc_count')
     source_performance = []
     for row in source_perf_qs:

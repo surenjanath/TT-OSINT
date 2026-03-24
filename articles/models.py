@@ -62,6 +62,9 @@ class NewsSource(models.Model):
 
     class Meta:
         ordering = ['name']
+        indexes = [
+            models.Index(fields=['is_active', 'name']),
+        ]
 
     def __str__(self):
         return self.name
@@ -99,6 +102,11 @@ class Article(models.Model):
 
     class Meta:
         ordering = ['-published_date']
+        indexes = [
+            models.Index(fields=['is_processed']),
+            models.Index(fields=['published_date']),
+            models.Index(fields=['source', 'published_date']),
+        ]
 
     def __str__(self):
         return self.title

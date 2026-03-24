@@ -4,8 +4,10 @@ With granular per-source and per-article logging callbacks.
 """
 import json
 import logging
+import random
 import time
 from datetime import datetime
+from email.utils import parsedate_to_datetime
 from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
 
 import feedparser
@@ -52,22 +54,70 @@ def normalize_url(url: str) -> str:
         return url.strip()
 
 
+# HTTP statuses where we wait and retry (rate limits / transient overload).
+_RETRY_AFTER_STATUSES = frozenset((429, 503))
+
+
+def _retry_delay_from_response(response, rate_strikes: int) -> float:
+    """Seconds to wait before the next attempt. Honors Retry-After; else exponential backoff."""
+    if response is not None:
+        ra = response.headers.get("Retry-After")
+        if ra:
+            ra = ra.strip()
+            try:
+                return min(max(float(ra), 1.0), 300.0)
+            except ValueError:
+                try:
+                    dt = parsedate_to_datetime(ra)
+                    if dt:
+                        wait = dt.timestamp() - time.time()
+                        return min(max(wait, 1.0), 300.0)
+                except (TypeError, ValueError, OSError):
+                    pass
+    base = 12.0
+    return min(base * (2 ** rate_strikes), 180.0)
+
+
 def _request_with_retry(url, headers, timeout, max_attempts=3, log_fn=None):
-    """GET request with exponential backoff retries."""
-    last_error = None
+    """GET with retries. 429/503 honor Retry-After and use longer backoff; other HTTP errors are not retried."""
+    if max_attempts < 1:
+        max_attempts = 1
+    rate_strikes = 0
     for attempt in range(max_attempts):
         try:
-            if attempt > 0:
-                delay = min(2 ** attempt, 10)
-                time.sleep(delay)
-                if log_fn:
-                    log_fn(f'    Retry {attempt + 1}/{max_attempts} after {delay}s', 'info')
             resp = requests.get(url, headers=headers, timeout=timeout)
-            resp.raise_for_status()
-            return resp
-        except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
-            last_error = e
-    raise last_error
+        except requests.exceptions.Timeout:
+            if attempt >= max_attempts - 1:
+                raise
+            delay = min(5 * (2 ** attempt), 45)
+            time.sleep(delay)
+            if log_fn:
+                log_fn(f'    Timeout — retry {attempt + 2}/{max_attempts} after {delay}s', 'info')
+            continue
+        except requests.exceptions.ConnectionError:
+            if attempt >= max_attempts - 1:
+                raise
+            delay = min(3 * (2 ** attempt), 30)
+            time.sleep(delay)
+            if log_fn:
+                log_fn(f'    Connection error — retry {attempt + 2}/{max_attempts} after {delay}s', 'info')
+            continue
+
+        if resp.status_code in _RETRY_AFTER_STATUSES:
+            if attempt >= max_attempts - 1:
+                resp.raise_for_status()
+            delay = _retry_delay_from_response(resp, rate_strikes) + random.uniform(0, 2.0)
+            rate_strikes += 1
+            if log_fn:
+                log_fn(
+                    f'    HTTP {resp.status_code} — waiting {delay:.0f}s (retry {attempt + 2}/{max_attempts})',
+                    'warning',
+                )
+            time.sleep(delay)
+            continue
+
+        resp.raise_for_status()
+        return resp
 
 
 def parse_flexible_date(date_str):
@@ -575,7 +625,9 @@ class APIScraper:
                         log_fn(f'🌐 [{source.name}] Connecting to API...', 'info')
 
                 start = time.time()
-                response = _request_with_retry(fetch_url, headers, timeout, log_fn=log_fn)
+                response = _request_with_retry(
+                    fetch_url, headers, timeout, max_attempts=6, log_fn=log_fn
+                )
                 elapsed = time.time() - start
                 data = response.json()
 
@@ -632,7 +684,7 @@ class APIScraper:
 
                 page_num += 1
                 if paginate and page_num < pages_to_fetch:
-                    time.sleep(1)
+                    time.sleep(2)
                 if unlimited and page_num >= pages_to_fetch and log_fn:
                     log_fn(f'    ⚠️ Reached safety limit of {API_PAGINATION_SAFETY_LIMIT} pages', 'warning')
 

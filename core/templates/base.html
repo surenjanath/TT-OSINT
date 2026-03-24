@@ -4,9 +4,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Trinidad & Tobago Crime and Incident Intelligence Map — Real-time AI-powered geospatial monitoring dashboard">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="robots" content="{% block meta_robots %}index, follow{% endblock %}">
+    <meta name="description" content="{% block meta_description %}Trinidad & Tobago crime and incident intelligence map — geospatial monitoring of news-derived incidents across Trinidad and Tobago.{% endblock %}">
+    <meta name="keywords" content="{% block meta_keywords %}Trinidad and Tobago, crime map, incidents, OSINT, geospatial, news intelligence{% endblock %}">
+    <link rel="canonical" href="{% block canonical_url %}{{ site_origin }}{{ request.path }}{% endblock %}">
 
     <title>{% block title %}{{ page_title|default:"Intelligence Map" }}{% endblock %} — TT OSINT</title>
+
+    <meta property="og:site_name" content="TT OSINT">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="en_TT">
+    <meta property="og:title" content="{% block og_title %}{{ page_title|default:"Intelligence Map" }} — TT OSINT{% endblock %}">
+    <meta property="og:description" content="{% block og_description %}Trinidad & Tobago crime and incident intelligence map — geospatial monitoring of news-derived incidents.{% endblock %}">
+    <meta property="og:url" content="{% block og_url %}{{ site_origin }}{{ request.path }}{% endblock %}">
+
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{% block twitter_title %}{{ page_title|default:"Intelligence Map" }} — TT OSINT{% endblock %}">
+    <meta name="twitter:description" content="{% block twitter_description %}Trinidad & Tobago crime and incident intelligence map — geospatial monitoring of news-derived incidents.{% endblock %}">
+
+    {% block structured_data %}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "name": "TT OSINT",
+          "url": "{{ site_origin }}/",
+          "description": "Trinidad and Tobago incident intelligence and crime mapping from open news sources.",
+          "inLanguage": "en-TT"
+        },
+        {
+          "@type": "Organization",
+          "name": "TT OSINT",
+          "url": "{{ site_origin }}/"
+        }
+      ]
+    }
+    </script>
+    {% endblock %}
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />

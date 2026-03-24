@@ -134,9 +134,20 @@ class Incident(models.Model):
 
     class Meta:
         ordering = ['-incident_date', '-created_at']
+        indexes = [
+            models.Index(fields=['status', 'incident_date']),
+            models.Index(fields=['status', 'category']),
+            models.Index(fields=['status', 'region']),
+            models.Index(fields=['status', 'latitude', 'longitude']),
+        ]
 
     def __str__(self):
         return f"{self.incident_type} — {self.location_name or 'Unknown location'}"
+
+    @property
+    def article(self):
+        """Alias for templates / legacy name (same as primary_article)."""
+        return self.primary_article
 
     @property
     def severity_color(self):

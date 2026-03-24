@@ -4,7 +4,7 @@ Views for the Articles feed.
 import json
 from django.shortcuts import render, get_object_or_404
 from django.core.paginator import Paginator
-from django.db.models import Q, Count
+from django.db.models import Count, Q, prefetch_related_objects
 from .models import Article, NewsSource
 
 
@@ -14,7 +14,6 @@ def article_list_view(request):
         Article.objects
         .select_related('source')
         .annotate(incident_count=Count('incidents'))
-        .prefetch_related('incidents')
     )
 
     search = request.GET.get('search', '').strip()
@@ -45,25 +44,32 @@ def article_list_view(request):
 
     articles_list = articles_list.order_by('-published_date')
 
-    # Stats (from filtered queryset before pagination)
-    total_filtered = articles_list.count()
-    processed_count = articles_list.filter(is_processed=True).count()
+    list_stats = articles_list.aggregate(
+        total_filtered=Count('pk', distinct=True),
+        processed_count=Count('pk', filter=Q(is_processed=True), distinct=True),
+    )
+    total_filtered = list_stats['total_filtered']
+    processed_count = list_stats['processed_count']
     processed_pct = round(processed_count / total_filtered * 100) if total_filtered else 0
-    # Count articles with at least one incident (for banner)
     if has_incidents_filter == 'yes':
-        with_incidents_count = total_filtered  # already filtered to has incidents
+        with_incidents_count = total_filtered
     elif has_incidents_filter == 'no':
-        with_incidents_count = 0  # already filtered to no incidents
+        with_incidents_count = 0
     else:
-        with_incidents_count = articles_list.filter(incident_count__gt=0).count()
+        with_incidents_count = articles_list.filter(incident_count__gt=0).aggregate(
+            c=Count('pk', distinct=True)
+        )['c']
     with_incidents_pct = round(with_incidents_count / total_filtered * 100) if total_filtered else 0
     by_source = list(
-        articles_list.values('source__name').annotate(count=Count('id')).order_by('-count')[:10]
+        articles_list.values('source__name')
+        .annotate(count=Count('pk', distinct=True))
+        .order_by('-count')[:10]
     )
 
     paginator = Paginator(articles_list, 20)
     page_number = request.GET.get('paged', 1)
     page_obj = paginator.get_page(page_number)
+    prefetch_related_objects(list(page_obj.object_list), 'incidents')
 
     context = {
         'page_title': 'News Feed',
